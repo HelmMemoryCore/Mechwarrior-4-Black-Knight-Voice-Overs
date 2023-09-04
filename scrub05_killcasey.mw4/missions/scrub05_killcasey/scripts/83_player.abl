@@ -1,0 +1,126 @@
+//*********************************************************************************
+
+fsm playeraifsm : integer;
+
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//
+//     Variable Declarations
+//
+//------------------------------------------------------------------
+	var
+
+		static integer			path;		 				// Path for movie
+		static integer			path2;		 			// Path for movie
+		static integer			piloting;		 		// Piloting skill
+		static integer			gunnery;		 		// Gunnery skill/chance to hit
+		static integer 			eliteLevel;			// Elite level.  This helps determine tactics, defensive manuevers, opportunity fire
+																				// and other things.  It indicates a general level of combat experience.
+		static integer			attackThrottle;	// My attack throttle
+		static integer			teleportNav;		// Used to move the player to the real starting point
+//------------------------------------------------------------------
+//
+//     Local Functions
+//
+//------------------------------------------------------------------
+
+function init;
+	code
+		path								= epa_PlayerDone;
+		path2								= epa_Path_PlayerPatrol;
+		piloting						= 100;
+		gunnery							= 100;
+		eliteLevel					= 100;
+		attackThrottle 			= 35;
+		//teleportnav 				= ena_navPlayer;				//Where the player enters the fray
+endfunction;
+
+//------------------------------------------------------------------
+//
+//     Main Code
+//
+//------------------------------------------------------------------
+	state startState;
+		code
+	If not isdead(playermech) then
+	 	
+		SetSkillLevel						(ME,piloting,gunnery,eliteLevel);
+		SetAttackThrottle				(ME,attackThrottle);
+		
+		trans go;
+	else
+		KillVoiceOvers;
+		endmission(false,15);
+		StartMusic("Music\Defeat",0.5,0.25,50);
+		KillVoiceOvers;
+		trans Loser;
+	endif;
+	
+	endstate;
+	
+  state Loser;
+		code
+			PlayVoiceOverOnce("VO\Generic\IanDestroyed",Talker_Rat);
+	endstate;
+	
+	state go;
+		code
+		
+		ordermoveto(path2,65,move_nocycle,true,true);
+		
+		if (missionwon == true) then
+			trans Victory;
+		endif;
+		
+	endstate;
+
+	state BaseCinema;
+		code
+  	
+		if ordermoveto(epa_Path_PlayerPatrol,80,move_nocycle,true,true) then
+			trans LookAround;
+		endif;
+		
+	endstate;
+	
+	state Victory;
+		code
+  	
+		if ordermoveto(epa_PlayerDone,80,move_nocycle,true,true) then
+			trans LookAround;
+		endif;
+		
+	endstate;
+
+	state LookAround;
+		code
+
+		ordermovelookout;
+		
+	endstate;
+
+	state deadState;
+		code
+
+	endstate;
+
+endfsm.
+//******************************************************************
+

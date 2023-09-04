@@ -1,0 +1,343 @@
+
+//------------------------------------------------------------------
+// NOTE: The fsm name below MUST be changed in order for the
+// script to be considered a unique entity!
+
+fsm farpatrol : integer;
+
+
+//------------------------------------------------------------------
+// Far Patrol:
+//   This script controls all enemy mechs before you get to the
+//   Mech base.
+//------------------------------------------------------------------
+
+
+
+//------------------------------------------------------------------
+//     Constants
+//------------------------------------------------------------------
+
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//     Types
+//------------------------------------------------------------------
+
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//     Variables
+//------------------------------------------------------------------
+
+	var
+		static integer			attackRange;		// At what range do I start shooting?
+		static integer			withdrawRange;		// At what range do I withdraw from combat completely?
+
+		static integer			piloting;			// Piloting skill
+		static integer			gunnery;			// Gunnery skill/chance to hit
+		static real				minDelay;			// Minimum amount of time I will wait between shots once a weapon is reloaded
+		static real				maxDelay;			// Maximum amount of time I will wait between shots once a weapon is reloaded
+		static integer 			eliteLevel;			// Elite level.  This helps determine tactics, defensive manuevers, opportunity fire
+													// and other things.  It indicates a general level of combat experience.
+		static integer			attackThrottle;		// My attack throttle
+		static integer			findTypes;			// What kind of enemies to look for
+        static integer			path;	            // What path to take.
+        static integer			speed;	            // Speed on the path.
+                
+ 		static integer			isShotRadius;		// How far away from me will I detect an enemy shot?
+
+		static integer 			attackSound;		// The attack sound I play when I first attack
+		static integer 			deathSound;			// The sound I play when I die
+		
+		static integer			mood;				// My default mood.
+
+		static integer			takeOffDistance;	// My take-off distance if I'm an airplane (ignored if not an airplane)
+        static boolean          timeroff;           // The shutdown timer is now counting.
+        static locpoint         mystart1;           // This is the starting location used for teleport
+        static locpoint         mystart2;           // This is the starting location used for teleport
+        static locpoint         mystart3;           // This is the starting location used for teleport
+        static locpoint         mystart4;           // This is the starting location used for teleport
+        static boolean          buffme;             // Buff up enemy stats if the ambush is blown
+
+        static integer          dorand;             // What a unit will do
+        static integer          whenrand;           // How long to do it
+        // static boolean          visible;            // Can be seen
+
+//------------------------------------------------------------------
+//     Init: my initialization function
+//------------------------------------------------------------------
+
+function Init;
+	code
+		// script-specific variables
+		attackRange		= 900;
+		withdrawRange	= attackRange * 3 / 2;
+		takeOffDistance	= 150;
+
+		// driver settings
+		piloting		= 80;
+		gunnery			= 90;
+		minDelay		= 0.6;
+		maxDelay		= 1.2;
+		eliteLevel		= 40;
+		attackThrottle	= 100;
+		isShotRadius	= 120;
+		attackSound		= -1; // no sound
+		deathSound		= -1; // no sound
+		mood			= DEFENSIVE_START;
+		findTypes		= FT_DEFAULT;
+        path            = -1;
+        speed =     70;
+        
+endfunction;
+
+//------------------------------------------------------------------
+//	StartState: my initial state
+//------------------------------------------------------------------
+
+state StartState;
+
+	code
+		SetFiringDelay			(ME,minDelay,maxDelay);
+		SetIgnoreFriendlyFire	(ME,true);
+		SetIsShotRadius			(ME,isShotRadius);
+		SetEntropyMood			(ME,mood);
+		SetCurMood				(ME,mood);
+		SetSkillLevel			(ME,piloting,gunnery,eliteLevel);
+		SetAttackThrottle		(ME,attackThrottle);
+
+        //SetSensorVisibility(me,false);
+      
+        switch (GetMemoryInteger(me,9))
+        
+            case 1:
+                OrderMoveTo(epa_WestPatrol,speed,move_nocycle,false,false);
+            endcase;
+        
+            case 2:
+                //OrderMoveTo(epa_WestPatrol,speed,move_nocycle,false,false);
+                //OrderMoveFollow(eve_wpatrol_1,-10,-10);
+                OrderMoveTo(epa_WestPatrol,speed,move_nocycle,false,false);
+                DoRand = 0;
+                WhenRand = 3;
+            endcase;
+            
+            case 3:
+                //OrderMoveTo(epa_WestPatrol,speed,move_nocycle,false,false);
+                OrderMoveFollow(eve_wpatrol_2,-20,0);
+                DoRand = 3;
+                WhenRand = 0;
+            endcase;
+            
+            case 4:
+                //OrderMoveTo(epa_WestPatrol,speed,move_nocycle,false,false);
+                OrderMoveFollow(eve_wpatrol_2,-30,10);
+                DoRand = 1;
+                WhenRand = 5;
+            endcase;
+
+            case 5:
+                OrderMoveTo(epa_EastPatrol,speed,move_nocycle,false,false);
+                DoRand = 2;
+                WhenRand = 1;
+            endcase;
+
+            case 6:
+                //OrderMoveTo(epa_EastPatrol,speed,move_nocycle,false,false);
+                OrderMoveFollow(eve_epatrol_1,-10,-10);
+            endcase;
+
+            case 7:
+                //OrderMoveTo(epa_EastPatrol,speed,move_nocycle,false,false);
+                OrderMoveFollow(eve_epatrol_1,-20,0);
+                DoRand = 0;
+                WhenRand = 2;
+            endcase;
+
+            case 8:
+                //OrderMoveTo(epa_EastPatrol,speed,move_nocycle,false,false);
+                OrderMoveFollow(eve_epatrol_1,-30,10);
+                DoRand = 3;
+            endcase;
+        
+        endswitch;
+
+        /*ClearMoveOrder(me);
+        Dorand = random(5);
+        Whenrand = random(5) + 5;
+        trans looking;*/
+        trans waitstate;
+
+endstate;
+
+//------------------------------------------------------------------
+//	Gettoplayer: Run Over to the Player
+//------------------------------------------------------------------
+
+state Gettoplayer;
+	code
+        		
+        if (FindEnemy(attackRange,findTypes)) then
+            trans AttackState;
+		endif;
+
+		ordermovetoobject(playermech,600);
+		
+endstate;
+
+     
+//------------------------------------------------------------------
+//	WaitState: wait for something to shoot
+//------------------------------------------------------------------
+
+state WaitState;
+	code
+        
+        if (not buffme) then
+            if (ambushblown) then
+        		piloting		= 90;   // was 80
+        		gunnery			= 110;  // was 70
+        		minDelay		= 0.4;  // was .6
+        		maxDelay		= 0.8;  // was 1.2
+        		eliteLevel		= 40;   // was 60
+        		SetFiringDelay(ME,minDelay,maxDelay);
+        		SetSkillLevel(ME,piloting,gunnery,eliteLevel);
+                buffme = true;
+            endif;
+        endif;
+
+        /* if (not visible) then
+            if (not iswithin(me,ena_inrange,500)) then
+                setsensorvisibility(me,true);
+                visible = true;
+            endif;
+        endif; */
+        
+        if (isshot(me)) then
+            Speed=80;
+            path=epa_EastPatrol2;
+        endif;
+        
+        if (path<>-1) then
+            OrderMoveTo(path,speed,move_nocycle,false,false);
+        endif;
+        
+        if (standandlook) then
+            ClearMoveOrder(me);
+            // Dorand = random(3);
+            //Whenrand = random(5) + 5;
+            StartTimer(13);
+            // SetTarget(ME,Playermech);
+            // OrderAttackTactic(TACTIC_RETREAT,true);
+            // OrderMoveFlee(playermech,80);
+            trans Looking;
+        endif;
+        
+        // if (FindEnemy(attackRange,findTypes)) then
+		// 	trans AttackState;
+		// endif;		
+
+        if (enemiesactive) then
+            SetTarget(ME,NO_UNIT);
+            trans gettoplayer;
+        endif;
+        
+        OrderFormationMove(GroupObjectID(22),epa_WestPatrol,speed,MOVE_NOCYCLE,FORMATION_1x12LINE,FORMTYPE_SPARSE,false);
+        OrderFormationMove(GroupObjectID(23),epa_EastPatrol,speed,MOVE_NOCYCLE,FORMATION_1x12LINE,FORMTYPE_SPARSE,false);
+        
+endstate;
+
+//------------------------------------------------------------------
+//	Looking: Just look around for awhile
+//------------------------------------------------------------------
+
+state Looking;
+    code
+
+        switch (DoRand)
+        
+            case 0:
+                SetCrouchState(me,true);
+            endcase;
+            
+            case 1:
+                OrderMoveLookOut;
+            endcase;
+        
+            case 2:
+                OrderMoveToObject(ena_stupid,120);
+            endcase;
+            
+            case 3:
+                OrderMoveToObject(ena_outro,120);
+            endcase;
+        
+        endswitch;
+
+        if (timegreater(13,whenrand)) then
+            SetCrouchState(me,false);
+            trans gettoplayer;
+        endif;
+
+        /* if (not visible) then
+            if (not iswithin(me,ena_inrange,500)) then
+                setsensorvisibility(me,true);
+                visible = true;
+            endif;
+        endif; */
+
+        /*if (enemiesactive) then
+            trans gettoplayer;
+        endif;
+        
+        OrderMoveLookOut;*/
+
+endstate;
+
+//------------------------------------------------------------------
+//	AttackState: look for something to shoot
+//------------------------------------------------------------------
+
+state AttackState;
+	code
+
+        /* if (not visible) then
+            setsensorvisibility(me,true);
+            visible = true;
+        endif; */
+
+        if (LeaveAttackState(withdrawRange)) then
+			OrderStopAttacking;
+			SetTarget(ME,NO_UNIT);
+            //SetSensorVisibility(me,false);
+            //Visible = false;
+			trans gettoplayer;
+		endif;
+
+        // OrderAttackTactic(TACTIC_SNIPE,true);
+        OrderAttackTactic(TACTIC_BACK_UP_AND_FIRE,true);
+		// OrderAttack(true);
+
+endstate;
+
+//------------------------------------------------------------------
+//	DeadState: OK, I kicked the bucket.
+//------------------------------------------------------------------
+
+state DeadState;
+	code
+		if (deathSound <> -1) then	
+			PlaySoundOnce(deathSound);
+		endif;		
+
+		orderDie;
+
+endstate;
+
+
+endfsm.
+

@@ -1,0 +1,216 @@
+
+//*********************************************************************************
+//The below line MUST be changed in order for the script to be considered
+//a unique entity.  The word Patrol must be changed to some other unique identifier
+fsm HeloPatrol : integer;
+
+//This unit patrols a specific path and attacks anything that comes near it.
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//
+//     Variable Declarations
+//
+//------------------------------------------------------------------
+	var
+	static integer			attackrange; 		    // When do I start shooting?
+																
+	static integer			piloting;  		 	    // piloting skill
+	static integer			gunnery; 				// hit chance,
+	static real				mindelay;				//minimum amount of time I will wait between shots once a weapon is reloaded
+	static real				maxdelay;	 		 	//maximum amount of time I will wait between shots once a weapon is reloaded
+	static integer 			speed;				 	// What speed so I move at?
+	static integer 			elitelevel;			    // % elite chance, This helps determine tactics, defensive manuevers, opportunity fire
+														// and other things that would normally be determined by combat experience
+
+ 	static integer			isshotradius;		    //how far away from me will I detect an enemy shot.
+	static integer			movetype;				//how will it move down the path?
+
+	static Boolean 			attacksoundplayed;
+	static integer 			attacksound; 		    // plays when it first attacks
+	static integer 			deathsound;		 	    // plays when it dies
+	
+	static integer			mood;					//What is my normal mood?
+	
+	static Boolean			reachedendofpath;	    //Have I gotten to the end of the path?
+														 //Note: This only gets set if movetype is set to move_nocycle.
+	static integer			Base;					//Where is my Base?  Am i too good for my HOME?
+	static integer			path;					//what path am I following?
+    static integer          mygroup;                // What group number I belong to
+    static integer          findtypes;
+    static integer          mydelay;                // How long the base copters take to get airborne
+	
+//------------------------------------------------------------------
+//
+//     Local Functions
+//
+//------------------------------------------------------------------
+
+function init;
+	code
+	
+	//These variables should not be changed by the designer without good reason
+	reachedendofpath    = FALSE;		//false
+	attacksoundplayed   = FALSE;		//false
+	
+	//Use this to set different values for different units using the same brain	
+		attackrange     = 900;				
+		piloting        = 90;							
+	    gunnery         = 90;			//20	
+		mindelay        = 0.5;							
+		maxdelay        = 1.0;			//2					
+		elitelevel      = 70;						
+	    speed           = 100;							 	
+		isshotradius    = 80;						 	
+		attacksound     = -1;
+		deathsound      = -1;
+		mood            = neutral_start;
+		findTypes		= FT_DEFAULT;
+        movetype = move_circle;
+            
+    switch (GetMemoryInteger(me,9))
+
+		case 1:				   // Northern Helicopter Patrol
+	    	path = epa_NHeloPath;
+            mygroup = 31;
+		endcase;
+
+		case 2:				   // Southern Helicopter Patrol
+    		path = epa_SHeloPath;
+            mygroup = 32;
+		endcase;
+        
+        case 3:
+            mydelay = random(90) + 30;
+        endcase;
+		
+	endswitch;
+
+	
+endfunction;
+
+//------------------------------------------------------------------
+//
+//     Main Code
+//
+//------------------------------------------------------------------
+state startState;
+
+	code
+		
+		SetFiringDelay(me,mindelay,maxdelay);
+		setignorefriendlyfire(me,true);
+		setisshotradius(me,isshotradius);
+		setentropymood(me,mood);
+		setcurmood(me,mood);
+		setskilllevel(me,piloting,gunnery,elitelevel);
+
+        if (mydelay > 0) then
+            setsensorvisibility(me,false);
+            trans waiting;
+        endif;
+
+		If (OrderTakeOff(30)) then
+			trans patrol;
+		endif;	
+        
+endstate;			
+
+state deadState;
+  code
+		if (deathsound <> -1) then	
+			PlaySoundOnce(deathsound);
+		endif;		
+						
+		orderDie;
+endstate;
+
+state waiting;
+    code
+
+        if (basestart) then
+            if (timegreater(12,mydelay)) then
+                if (ordertakeoff(50)) then
+                    setsensorvisibility(me,true);
+                    trans gettoplayer;
+                endif;
+            endif;
+        endif;
+    
+endstate;
+
+state patrol;
+
+  var
+    ObjectID foe;
+
+		code
+
+            if (alarm) then
+                trans gettoplayer;
+            endif;
+
+    	    OrderFormationMove(GroupObjectID(mygroup),path,speed,movetype,FORMATION_LINE,FORMTYPE_NORMAL,FALSE);                    
+    			
+    		//Find me a target
+    		if (setmytarget(attackrange)) then
+    			trans attack;
+    	 	endif;
+			
+	endstate;
+
+state gettoplayer;
+	code
+        		
+        if (FindEnemy(attackRange,findTypes)) then
+			trans attack;
+		endif;
+
+		ordermovetoobject(playermech,600);
+		
+endstate;
+
+//------------------------------------------------------------------
+//
+//     Attack State
+//
+//------------------------------------------------------------------
+	state attack;
+		code
+
+            firstspot = true;
+            
+    		if (LeaveAttackState(attackrange*3/2)) then
+    			orderstopattacking;
+    			trans gettoplayer;
+    		endif;
+    		
+    		//the ever popular attack order
+            OrderAttack (true);
+    		
+    		//maybe swap targets when I am shot.
+    		if ((isShot (me)) and (rand(0,75) <= 1)) then
+      		    setTarget(me,whoShot(me));
+    		endif;
+					
+	endstate;
+
+
+endfsm.
+//******************************************************************
+

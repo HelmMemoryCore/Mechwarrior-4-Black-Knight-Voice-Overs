@@ -1,0 +1,254 @@
+
+//------------------------------------------------------------------
+// NOTE: The fsm name below MUST be changed in order for the
+// script to be considered a unique entity!
+//------------------------------------------------------------------
+
+fsm enemymech : integer;
+
+//------------------------------------------------------------------
+// Enemy Mech:
+//   These are the enemy mechs you encounter.
+//------------------------------------------------------------------
+
+
+//------------------------------------------------------------------
+//     Constants
+//------------------------------------------------------------------
+
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//     Types
+//------------------------------------------------------------------
+
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//     Variables
+//------------------------------------------------------------------
+
+	var
+		
+    // Standard Mech and Vehicle variables
+		static integer			TakeOffDistance;	// My take-off distance if I'm an airplane (ignored if not an airplane)
+        static integer			AttackRange;		// At what range do I start shooting?
+		static integer			WithdrawRange;		// At what range do I withdraw from combat completely?
+                                                    //
+		static integer			AttackThrottle;		// My attack throttle
+		static integer			FindTypes;			// What kind of enemies to look for
+		static integer			Piloting;			// Piloting skill
+		static integer			Gunnery;			// Gunnery skill/chance to hit
+		static real				MinDelay;			// Minimum amount of time I will wait between shots once a weapon is reloaded
+		static real				MaxDelay;			// Maximum amount of time I will wait between shots once a weapon is reloaded
+		static integer 			EliteLevel;			// Elite level.  This helps determine tactics, defensive manuevers, opportunity fire
+													//   and other things.  It indicates a general level of combat experience.
+        static integer			Path;	            // What path to take.
+        static integer			Speed;	            // Speed on the path.
+		static integer			FormationType;		// What kind of formation am I in?
+		static integer			FormationDensity;	// How densely are we packed?
+		static integer			MoveType;			// How I move along the path
+                                                    //
+ 		static integer			IsShotRadius;		// How far away from me will I detect an enemy shot?
+                                                    //
+		static integer 			AttackSound;		// The attack sound I play when I first attack
+		static integer 			DeathSound;			// The sound I play when I die
+		                                            //
+		static integer			Mood;				// My default 
+    //
+
+        static integer          MyGroup;            // Group Number of the Object
+        static locpoint         MyNav;              // Starting nav point for teleporters
+
+//------------------------------------------------------------------
+//     Init: my initialization function
+//------------------------------------------------------------------
+
+function Init;
+	code
+		// script-specific variables
+		attackRange		= 900;
+		withdrawRange	= attackRange * 3 / 2;
+		path			= -1;
+		moveType		= move_nocycle;
+		speed			= 50;
+		formationType	= 1;
+		formationDensity= formtype_sparse;
+		takeOffDistance	= 150;
+
+		// driver settings
+		piloting		= 70;
+		gunnery			= 120;
+		minDelay		= 0.3;
+		maxDelay		= 0.6;
+		eliteLevel		= 90;
+		attackThrottle	= 90;
+		isShotRadius	= 120;
+		attackSound		= -1; // no sound
+		deathSound		= -1; // no sound
+		mood			= DEFENSIVE_START;
+		findTypes		= FT_DEFAULT;
+
+        if (getmemoryinteger(me,9)==0) then
+            MyGroup=0;
+        endif;
+
+        if (getmemoryinteger(me,9)==1) then
+            MyGroup=1;
+        endif;
+
+        if (getmemoryinteger(me,9)==2) then
+            MyGroup=2;
+    		mood			= AGRESSIVE_START;
+        endif;
+        
+        if (getmemoryinteger(me,9)==3) then           // Ian Dresari's 'Mech
+            MyGroup=2;
+            piloting		= 95;
+            gunnery			= 666;  // Was 280
+            minDelay		= 0.0;
+            maxDelay		= 0.3;
+            eliteLevel		= 100;
+            attackThrottle	= 100;
+    		mood			= AGRESSIVE_START;
+        endif;
+
+endfunction;
+
+//------------------------------------------------------------------
+//	StartState: my initial state
+//------------------------------------------------------------------
+
+state StartState;
+
+	code
+		SetFiringDelay			(ME,minDelay,maxDelay);
+		SetIgnoreFriendlyFire	(ME,true);
+		SetIsShotRadius			(ME,isShotRadius);
+		SetEntropyMood			(ME,mood);
+		SetCurMood				(ME,mood);
+		SetSkillLevel			(ME,piloting,gunnery,eliteLevel);
+		SetAttackThrottle		(ME,attackThrottle);
+
+        Shutdown(me);
+        
+        if (MyGroup==2) then
+            GetLocation(me,MyNav);
+            teleporttohell(me);
+        endif;
+
+        trans waiting;
+        
+endstate;
+
+state Waiting;
+    code
+
+        if (mygroup==0) then
+            if (ambush1) then
+                startup(me);
+                trans GotoPlayer;
+            endif;
+        endif;
+
+        if (mygroup==1) then
+            if (ambush2) then
+                startup(me);
+                trans GotoPlayer;
+            endif;
+        endif;
+        
+        if (mygroup==2) then
+            if (Obj1) then
+                teleport(me,MyNav);
+                startup(me);
+                trans GotoPlayer;
+            endif;
+        endif;
+    
+endstate;
+
+//------------------------------------------------------------------
+//	FollowPathState: follow our path, but keep an eye out for enemies
+//------------------------------------------------------------------
+
+state FollowPathState;
+	code
+		if (FindEnemy(attackRange,findTypes)) then
+			trans AttackState;
+		endif;
+
+		if (path <> -1) then
+            OrderMoveTo(path,speed,move_nocycle,false,false);
+        else
+		    OrderMoveLookOut;
+        endif;
+        
+endstate;
+
+//------------------------------------------------------------------
+//	Gotoplayer: Run Over to the Player
+//------------------------------------------------------------------
+
+state Gotoplayer;
+	code
+
+        if (FindEnemy(attackRange,findTypes)) then
+            trans AttackState;
+		endif;
+
+		ordermovetoobject(playermech,600);
+		
+endstate;
+
+//------------------------------------------------------------------
+//	AttackState: attack my target
+//------------------------------------------------------------------
+
+state AttackState;
+	code
+		if (LeaveAttackState(withdrawRange)) then
+			OrderStopAttacking;
+			SetTarget(ME,NO_UNIT);
+			trans FollowPathState;
+		endif;
+
+		if (attackSound <> -1) then	
+			PlaySoundOnce(attackSound);
+		endif;
+        
+        // Chance the enemy retargets when shot upon
+        if (isshot(me)) then
+            if (random(100)>75) then
+                SetTarget(ME,WhoShot(me));
+            endif;
+        endif;
+
+		if (gunnery==666) then
+            OrderAttackTactic(TACTIC_RUSH,true);
+        else
+            OrderAttack(true);
+        endif;
+
+endstate;
+
+//------------------------------------------------------------------
+//	DeadState: OK, I kicked the bucket.
+//------------------------------------------------------------------
+
+state DeadState;
+	code
+		if (deathSound <> -1) then	
+			PlaySoundOnce(deathSound);
+		endif;		
+
+		orderDie;
+
+endstate;
+
+
+endfsm.
+

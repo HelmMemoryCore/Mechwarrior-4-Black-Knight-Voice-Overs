@@ -1,0 +1,257 @@
+
+//------------------------------------------------------------------
+// NOTE: The fsm name below MUST be changed in order for the
+// script to be considered a unique entity!
+
+fsm airintercept : integer;
+
+
+//------------------------------------------------------------------
+// Air Intercept:
+//   This script controls all the flying opponents in this mission.
+//   If the player has completed the other mission then they aren't
+//   there.
+//------------------------------------------------------------------
+
+
+
+//------------------------------------------------------------------
+//     Constants
+//------------------------------------------------------------------
+
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//     Types
+//------------------------------------------------------------------
+
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//     Variables
+//------------------------------------------------------------------
+
+	var
+		static integer			attackRange;		// At what range do I start shooting?
+		static integer			withdrawRange;		// At what range do I withdraw from combat completely?
+
+		static integer			piloting;			// Piloting skill
+		static integer			gunnery;			// Gunnery skill/chance to hit
+		static real				minDelay;			// Minimum amount of time I will wait between shots once a weapon is reloaded
+		static real				maxDelay;			// Maximum amount of time I will wait between shots once a weapon is reloaded
+		static integer 			eliteLevel;			// Elite level.  This helps determine tactics, defensive manuevers, opportunity fire
+													// and other things.  It indicates a general level of combat experience.
+		static integer			attackThrottle;		// My attack throttle
+		static integer			findTypes;			// What kind of enemies to look for
+
+ 		static integer			isShotRadius;		// How far away from me will I detect an enemy shot?
+
+		static integer 			attackSound;		// The attack sound I play when I first attack
+		static integer 			deathSound;			// The sound I play when I die
+		
+		static integer			mood;				// My default mood.
+
+		static integer			takeOffDistance;	// My take-off distance if I'm an airplane (ignored if not an airplane)
+        static boolean          timeroff;           // The shutdown timer is now counting.
+        static boolean          goboom;             // The first Rebel Mech will blow up after a time
+
+//------------------------------------------------------------------
+//     Init: my initialization function
+//------------------------------------------------------------------
+
+function Init;
+	code
+		// script-specific variables
+		attackRange		= 900;
+		withdrawRange	= attackRange * 3 / 2;
+		takeOffDistance	= 150;
+
+		// driver settings
+		piloting		= 80;
+		gunnery			= 60;
+		minDelay		= 0.3;
+		maxDelay		= 0.8;
+		eliteLevel		= 60;
+		attackThrottle	= 80;
+		isShotRadius	= 120;
+		attackSound		= -1; // no sound
+		deathSound		= -1; // no sound
+		mood			= NEUTRAL_START;
+		findTypes		= FT_DEFAULT;
+
+		if (GetMemoryInteger(me,9)==0) then         // Integer 0 = Ambush Mechs at Nav Alpha
+		    piloting		= 80;
+		    gunnery			= 80;
+	    	minDelay		= 0.1;
+    		maxDelay		= 0.4;
+            eliteLevel		= 90;
+		endif;
+
+endfunction;
+
+//------------------------------------------------------------------
+//	StartState: my initial state
+//------------------------------------------------------------------
+
+state StartState;
+
+	code
+		SetFiringDelay			(ME,minDelay,maxDelay);
+		SetIgnoreFriendlyFire	(ME,true);
+		SetIsShotRadius			(ME,isShotRadius);
+		SetEntropyMood			(ME,mood);
+		SetCurMood				(ME,mood);
+		SetSkillLevel			(ME,piloting,gunnery,eliteLevel);
+		SetAttackThrottle		(ME,attackThrottle);
+
+		if (GetMemoryInteger(me,9)==0) then         // Integer 0 = Initial Patrol
+			trans gettoplayer;
+		endif;
+
+        SetSensorVisibility(me,false);
+        
+		if (GetMemoryInteger(me,9)==1) then         // Integer 1 = Attack after Nav Alpha
+            shutdown(me);
+            trans teleporter1;
+		endif;
+
+		if (GetMemoryInteger(me,9)==2) then         // Integer 2 = Attack after Nav Beta
+            shutdown(me);
+            trans teleporter2;
+		endif;
+
+		if (GetMemoryInteger(me,9)==3) then         // Integer 3 = Attack after they get to Nav Gamma
+            shutdown(me);
+            trans teleporter3;
+		endif;
+
+        // trans waitstate;                            // Integer 9 = Medium mech decoy near Nav Alpha
+
+
+endstate;
+
+//------------------------------------------------------------------
+//	Gettoplayer: Run Over to the Player
+//------------------------------------------------------------------
+
+state Gettoplayer;
+	code
+        		
+        if (OrderTakeoff(takeoffdistance)) then
+			trans Gettoplayer2;
+		endif;
+		
+endstate;
+
+state Gettoplayer2;
+    code
+    
+        if (FindEnemy(attackRange,findTypes)) then
+			trans AttackState;
+		endif;
+
+		ordermovetoobject(playermech,600);
+
+endstate;
+
+//------------------------------------------------------------------
+//	Teleporter: Teleport off the map until the resources are cleared
+//------------------------------------------------------------------
+
+state teleporter1;
+	code
+
+        if (isshot(eve_farpatrol_a1)) then
+            // if (not iswithin(playermech,locpoint(mystart),1000)) then
+                SetSensorVisibility(me,true);
+                startup(me);
+                trans gettoplayer;
+            // endif;     
+		endif;
+		
+endstate;
+
+//------------------------------------------------------------------
+//	Teleporter: Teleport off the map until the resources are cleared
+//------------------------------------------------------------------
+
+state teleporter2;
+	code
+
+        if (iswithin(playermech,ena_Nav_Beta,400)) then
+            // if (not iswithin(playermech,mystart,1000)) then            
+                SetSensorVisibility(me,true);
+                startup(me);
+                trans gettoplayer;
+		    // endif;
+        endif;
+		
+endstate;
+
+//------------------------------------------------------------------
+//	Teleporter: Teleport off the map until the resources are cleared
+//------------------------------------------------------------------
+
+state teleporter3;
+	code
+
+        if (iswithin(playermech,ena_Nav_Gamma,400)) then
+            // if (not iswithin(playermech,mystart,1000)) then
+                SetSensorVisibility(me,true);
+                startup(me);
+                trans gettoplayer;
+		    // endif;
+        endif;
+		
+endstate;
+
+//------------------------------------------------------------------
+//	WaitState: wait for something to shoot
+//------------------------------------------------------------------
+
+//state WaitState;
+//	code
+//        
+//        if (FindEnemy(attackRange,findTypes)) then
+//			trans AttackState;
+//		endif;		
+//       
+//endstate;
+
+//------------------------------------------------------------------
+//	AttackState: look for something to shoot
+//------------------------------------------------------------------
+
+state AttackState;
+	code
+
+        if (LeaveAttackState(withdrawRange)) then
+			OrderStopAttacking;
+			SetTarget(ME,NO_UNIT);
+			trans gettoplayer;
+		endif;
+
+		OrderAttack(true);
+
+endstate;
+
+//------------------------------------------------------------------
+//	DeadState: OK, I kicked the bucket.
+//------------------------------------------------------------------
+
+state DeadState;
+	code
+		if (deathSound <> -1) then	
+			PlaySoundOnce(deathSound);
+		endif;		
+
+		orderDie;
+
+endstate;
+
+
+endfsm.
+

@@ -1,0 +1,279 @@
+
+//------------------------------------------------------------------
+// NOTE: The fsm name below MUST be changed in order for the
+// script to be considered a unique entity!
+//------------------------------------------------------------------
+
+fsm checkmech : integer;
+
+
+//------------------------------------------------------------------
+// CheckMech:
+//   This controls the Mechs at the various checkpoints.
+//------------------------------------------------------------------
+
+
+
+//------------------------------------------------------------------
+//     Constants
+//------------------------------------------------------------------
+
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//     Types
+//------------------------------------------------------------------
+
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//     Variables
+//------------------------------------------------------------------
+
+	var
+    
+    // Standard Mech and Vehicle variables
+        static integer			attackRange;		// At what range do I start shooting?
+		static integer			withdrawRange;		// At what range do I withdraw from combat completely?
+                                                    //
+		static integer			piloting;			// Piloting skill
+		static integer			gunnery;			// Gunnery skill/chance to hit
+		static real				minDelay;			// Minimum amount of time I will wait between shots once a weapon is reloaded
+		static real				maxDelay;			// Maximum amount of time I will wait between shots once a weapon is reloaded
+		static integer 			eliteLevel;			// Elite level.  This helps determine tactics, defensive manuevers, opportunity fire
+													// and other things.  It indicates a general level of combat experience.
+		static integer			attackThrottle;		// My attack throttle
+		static integer			findTypes;			// What kind of enemies to look for
+        static integer			path;	            // What path to take.
+        static integer			speed;	            // Speed on the path.
+                                                    //
+ 		static integer			isShotRadius;		// How far away from me will I detect an enemy shot?
+                                                    //
+		static integer 			attackSound;		// The attack sound I play when I first attack
+		static integer 			deathSound;			// The sound I play when I die
+		                                            //
+		static integer			mood;				// My default 
+		static integer			takeOffDistance;	// My take-off distance if I'm an airplane (ignored if not an airplane)
+    //
+		
+        static integer			groupNumber;		// What's my group -- i.e. I will use GroupObjectID(groupNumber) to identify my group
+		static integer			formationType;		// What kind of formation am I in?
+		static integer			formationDensity;	// How densely are we packed?
+		static integer			moveType;			// How I move along the path
+        static locpoint         starter;            // Where the Mech starts
+        static boolean          canbeseen;          // The Mech is now visible
+        static integer          mygroup;            // This is the Mechs group number
+        static boolean          warstarts;          // They will start duking it out at this range
+        static integer          mytactic;           // This is a random number for how they fight
+        static boolean          peekaboo;           // Controls when a vehicles is visible
+
+//------------------------------------------------------------------
+//     Init: my initialization function
+//------------------------------------------------------------------
+
+function Init;
+	code
+		// script-specific variables
+		attackRange		= 500;      // Was 300
+		withdrawRange	= attackRange * 3 / 2;
+		groupNumber		= 0;
+		path			= -1;
+		moveType		= move_nocycle;
+		speed			= 50;
+		formationType	= 1;
+		formationDensity= formtype_sparse;
+		takeOffDistance	= 150;
+
+		// driver settings
+		piloting		= 90;
+		gunnery			= 90; // reduced from 130 by fifield
+		minDelay		= 0.2;
+		maxDelay		= 0.6;
+		eliteLevel		= 40; // reduced from 60 by fifield
+		attackThrottle	= 90;
+		isShotRadius	= 120;
+		attackSound		= -1; // no sound
+		deathSound		= -1; // no sound
+		mood			= AGRESSIVE_START;
+		findTypes		= FT_DEFAULT;
+
+//      if (getmemoryinteger(me,9)==1) then
+//          path = epa_EnemyConvoyPath
+//      endif;
+
+endfunction;
+
+//------------------------------------------------------------------
+//	StartState: my initial state
+//------------------------------------------------------------------
+
+state StartState;
+
+	code
+		SetFiringDelay			(ME,minDelay,maxDelay);
+		SetIgnoreFriendlyFire	(ME,true);
+		SetIsShotRadius			(ME,isShotRadius);
+		SetEntropyMood			(ME,mood);
+		SetCurMood				(ME,mood);
+		SetSkillLevel			(ME,piloting,gunnery,eliteLevel);
+		SetAttackThrottle		(ME,attackThrottle);
+
+        GetLocation(me,starter);
+
+      /*  switch (GetMemoryInteger(me,9))
+        
+            case 0:             // Nav Alpha Mechs
+                groupnumber     = 20;
+        		piloting		= 70;
+        		gunnery			= 50;
+        		minDelay		= 1.5;
+        		maxDelay		= 3.0;
+        		eliteLevel		= 45;
+		        attackThrottle	= 60;
+            endcase;
+            
+            case 1:             // Nav Beta Mechs
+                groupnumber     = 21;
+        		piloting		= 60;
+        		gunnery			= 70;
+        		minDelay		= 1.0;
+        		maxDelay		= 2.0;
+        		eliteLevel		= 45;
+		        attackThrottle	= 60;
+            endcase;
+            
+            case 2:             // Nav Gamma Mechs
+                groupnumber     = 22;
+        		piloting		= 50;
+        		gunnery			= 40;
+        		minDelay		= 1.5;
+        		maxDelay		= 3.0;
+        		eliteLevel		= 45;
+		        attackThrottle	= 60;
+            endcase;
+            
+            case 3:             // Nav Delta Mechs
+                groupnumber     = 23;
+        		piloting		= 50;
+        		gunnery			= 50;
+        		minDelay		= 1.5;
+        		maxDelay		= 3.0;
+        		eliteLevel		= 45;
+		        attackThrottle	= 60;
+            endcase;
+            
+        endswitch; 
+								*/
+        mytactic = random(2);   // This is a random number for how that mech will fight
+        SetSensorVisibility(me,false);
+        
+        trans FollowPathState;
+        
+endstate;
+
+//------------------------------------------------------------------
+//	FollowPathState: follow our path, but keep an eye out for enemies
+//------------------------------------------------------------------
+
+state FollowPathState;
+	code
+
+        if (FindEnemy(attackRange,findTypes)) then
+			trans AttackState;
+		endif;
+
+        if (isshot(GroupObjectID(mygroup))) then    // You shoot my buds, I shoot you.
+            SetTarget(me,WhoShot(GroupObjectID(mygroup)));
+            trans AttackState;
+        endif;
+        
+        if (not peekaboo) then
+            if (iswithin(GroupObjectID(1),me,500)) then
+                SetSensorVisibility(me,true);
+                Peekaboo = true;
+            endif;
+        endif;
+
+        OrderMoveLookOut;
+        
+endstate;
+
+//------------------------------------------------------------------
+//	Gotoplayer: Run Over to the Player
+//------------------------------------------------------------------
+
+state Gotoplayer;
+	code
+
+        if (FindEnemy(attackRange,findTypes)) then
+			trans AttackState;
+		endif;
+
+        if (not peekaboo) then
+            if (iswithin(GroupObjectID(1),me,500)) then
+                SetSensorVisibility(me,true);
+                Peekaboo = true;
+            endif;
+        endif;
+
+		ordermovetoobject(playermech,600);
+		
+endstate;
+
+//------------------------------------------------------------------
+//	AttackState: attack my target
+//------------------------------------------------------------------
+
+state AttackState;
+	code
+		if (LeaveAttackState(withdrawRange)) then
+			OrderStopAttacking;
+			SetTarget(ME,NO_UNIT);
+			trans FollowPathState;
+		endif;
+
+		if (attackSound <> -1) then	
+			PlaySoundOnce(attackSound);
+		endif;
+
+        switch (mytactic)
+            case 0:
+		        OrderAttackTactic(tactic_rush,true);
+            endcase;
+            
+            case 1:
+		        OrderAttackTactic(tactic_rear,true);
+            endcase;
+            
+            case 2:
+		        OrderAttack(true);
+            endcase;
+        endswitch;
+
+        if (not peekaboo) then
+            SetSensorVisibility(me,true);
+            Peekaboo = true;
+        endif;
+
+endstate;
+
+//------------------------------------------------------------------
+//	DeadState: OK, I kicked the bucket.
+//------------------------------------------------------------------
+
+state DeadState;
+	code
+		if (deathSound <> -1) then	
+			PlaySoundOnce(deathSound);
+		endif;		
+
+		orderDie;
+
+endstate;
+
+
+endfsm.
+

@@ -1,0 +1,414 @@
+
+//*********************************************************************************
+//The below line MUST be changed in order for the script to be considered
+//a unique entity.  The word Patrol must be changed to some other unique identifier
+fsm Vo04_MechEnemy : integer;
+
+//This unit patrols a specific path and attacks anything that comes near it.
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//
+//     Variable Declarations
+//
+//------------------------------------------------------------------
+	var
+	static integer			attackrange; 			// When do I start shooting?
+																
+	static integer			piloting; 				// piloting skill
+	static integer			gunnery; 					// hit chance,
+	static real					mindelay;					// minimum amount of time I will wait between shots once a weapon is reloaded
+	static real					maxdelay;					// maximum amount of time I will wait between shots once a weapon is reloaded
+	static integer 			speed;			 			// What speed so I move at?
+	static integer 			elitelevel; 			// % elite chance, This helps determine tactics, defensive manuevers, opportunity fire
+																				// and other things that would normally be determined by combat experience
+
+ 	static integer			isshotradius;			// how far away from me will I detect an enemy shot.
+	static integer			movetype;					// how will it move down the path?
+
+	static Boolean 			attacksoundplayed;
+	static integer 			attacksound; 			// plays when it first attacks
+	static integer 			deathsound; 			// plays when it dies
+	
+	static integer			mood;							// What is my normal mood?
+	
+	static Boolean			Resumed;					// Have I gotten to the end of the path?
+	static Boolean			reachedendofpath;			// Have I gotten to the end of the path?
+																						// Note: This only gets set if movetype is set to move_nocycle.
+	static integer			path;						 			// what path am I following?
+	static Boolean 			attackersdistractit;	// if FALSE, it won't leave the path, even when things
+																						// are shooting it. It will shoot back. Defaults to true
+																						// Once unit reaches the end of the path, It attacks freely.
+	static Boolean 			Chaser;								// These guys will give chase
+	static Boolean 			Elite;								// Left from other script
+	static Boolean 			Secret;								// Shutdown to start for ambush or to save CPU time
+	static Boolean 			EliteSpoke;							// 
+    
+	static integer			teleportNav;					// All the elites will have this value set to a different Nav
+	
+	static ObjectID 		myVehicle;
+	static Locpoint 		myStart;							//	where I begin the game
+	static Boolean			MyTrigger;				// What Global Boolean Sets me off?
+//------------------------------------------------------------------
+//
+//     Local Functions
+//
+//------------------------------------------------------------------
+
+function init;
+	code
+	
+	Elite 								= FALSE;
+	Secret 								= FALSE;
+    EliteSpoke                          = FALSE;
+	 				
+ 	switch (GetMemoryInteger(me,9))
+
+	case 13:															//Mechs Waiting in Ambush in the crack (Nav Alpha)
+	
+		attackrange					= 750;
+		piloting 				 		= 70;				
+		gunnery 				 		= 70;					
+		mindelay 						= 0.5;				
+		maxdelay 						= 1.0;				
+		speed 							= 70;						
+		elitelevel 					= 60;			
+		IsShotRadius 				= 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood 								= neutral_start;
+		path 								= epa_Path_CrackAmbush;
+		ReachedEndOfPath 		= False;
+		Resumed 						= False;
+		Attacksoundplayed 	= False;					
+		Secret 							= TRUE;
+		myTrigger						=	CrackTime;
+		
+	endcase;
+		
+	case 15:															 //RunnerRear  Give Chase When 2 dead of grp 13
+			
+		attackrange         = 1000;
+		piloting            = 70;
+		gunnery             = 75;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 100;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_RunnerRun;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		myTrigger						=	RunnerTime;
+		
+	endcase;
+		
+	case 31:						 									// CityDwell
+		
+		attackrange         = 800;
+		piloting            = 70;
+		gunnery             = 60;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= -1;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		Secret 							= TRUE;
+		MyTrigger						= CityTime;
+		
+	endcase;
+		
+	case 33:						 									// Orbital
+		
+		attackrange         = 900;
+		piloting            = 70;
+		gunnery             = 70;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_circle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Orbital;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		
+	endcase;
+		
+	case 35:															 // CalliopePerch
+	
+		attackrange         = 1000;
+		piloting            = 70;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= -1;						 //they target HQ
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		Secret 							= TRUE;
+		MyTrigger						= CalliopeTime;
+		
+	endcase;
+		
+	case 37:															 // Shutdown Until 3 of 6 defenders are dead- then attack
+		
+		attackrange         = 1000;
+		piloting            = 70;
+		gunnery             = 80;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Volcano;							//targets HQ
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		Secret 							= TRUE;
+		MyTrigger						= VolcanoTime;
+		
+	endcase;
+		
+	endswitch;
+ 	
+endfunction;
+
+function CheckTriggers;
+	code
+ 	
+	switch (GetMemoryInteger(me,9))
+
+	case 13:															//Mechs Waiting in Ambush in the crack (Nav Alpha)
+		myTrigger						=	CrackTime;
+	endcase;
+		
+	case 15:															 //RunnerRear  Give Chase When 2 dead of grp 13
+		myTrigger						=	RunnerTime;
+	endcase;
+		
+	case 31:						 									// CityDwell
+		MyTrigger						= CityTime;
+	endcase;
+		
+	case 35:															 // CalliopePerch
+		MyTrigger						= CalliopeTime;
+	endcase;
+		
+	case 37:															 // Shutdown Until 3 of 6 defenders are dead- then attack
+		MyTrigger						= VolcanoTime;
+	endcase;
+		
+	endswitch;
+
+endfunction;
+//------------------------------------------------------------------
+//
+//     Main Code
+//				
+//								
+//------------------------------------------------------------------
+state startState;
+
+	code
+		SetFiringDelay					(me,mindelay,maxdelay);
+		setignorefriendlyfire		(me,true);
+		setisshotradius					(me,isshotradius);
+		setentropymood					(me,mood);
+		setcurmood							(me,mood);
+		setskilllevel						(me,piloting,gunnery,elitelevel);
+		//setsearchlight				(me,on);
+		//startexecute					(me);
+		//setalignment					(me,enemy);
+		
+		GetLocation(me,mystart);
+		
+		if (Secret == True) then
+			shutdown(me);
+			trans hangoutSECRET;
+		else
+			trans patrol;
+		endif;
+
+endstate;			
+
+state deadState;
+  code
+		orderDie;
+endstate;
+
+state hangoutSECRET;
+  code
+		CheckTriggers;
+		
+		If ((isShot (me)))	then
+			startup(me);
+			MyTrigger = true;
+			trans patrol;
+		endif;
+		
+		if ((iswithin(me,(groupobjectid(1)),200)) == true) then
+			startup(me);
+			MyTrigger = true;
+			trans patrol;
+		endif;
+		
+		If (MyTrigger == true) then
+			startup(me);
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveto(path,speed,movetype,true,true);
+			else
+				chaser = true;
+			endif;
+  		setTarget(me,playermech);
+			trans patrol;
+		endif;
+						
+endstate;
+	
+state hangoutELITE;
+  code
+		
+		If (MyTrigger == true) then
+			startup(me);
+			Teleport(me,myStart);
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveto(path,speed,movetype,true,true);
+			else
+				chaser = true;
+			endif;
+  		setTarget(me,playermech);
+			trans patrol;
+		endif;
+						
+endstate;
+	
+	state patrol;
+
+  var
+    ObjectID foe;
+
+		code
+
+	//head down the path.  If this has already been done
+	// or if there is no path set then look around.
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+					if ((orderMoveto(path,speed,movetype,true,true)) == TRUE) then
+						reachedendofpath = TRUE;
+						If (Chaser == True) then
+							setTarget(me,playermech);
+							trans GiveChase;
+						endif; 			
+					endif; 			
+			else	 		 		
+				ordermovelookout;			
+			endif;
+			
+		//Find me a target
+		if (setmytarget(attackrange)) then
+			trans attack;
+	 	endif;
+			
+	endstate;
+
+//------------------------------------------------------------------
+//
+//     attack state : description
+//
+//------------------------------------------------------------------
+	state attack;
+		
+		code
+		
+		speed = 600;						//Changed from 60 to keep 'em fast
+		
+    /* if EliteSpoke == False then
+        if MyTrigger == VolcanoTime and iswithin(me,playermech, 650) then
+		    PlayLanceMateSound("vox\op5\mi4\elite",1);				//Isa Cai Gre
+            EliteSpoke = TRUE;
+		endif;
+	endif; */
+        
+		if (LeaveAttackState(attackrange*2)) then
+			orderstopattacking;
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,true);
+			else
+				trans patrol;
+			endif;
+		endif;
+		
+		//the ever popular attack order
+    orderAttack (attackersdistractit);
+		
+		//maybe swap targets when I am shot.
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 								
+	endstate;
+  	
+		state GiveChase;
+		
+		code
+
+		speed = 600;						//
+		
+		if (LeaveAttackState(attackrange*3)) then
+			orderstopattacking;
+			
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,true);
+			else
+				trans patrol;
+			endif;
+		endif;
+		
+		//Find me a target
+		if (setmytarget(attackrange)) then
+			trans attack;
+	 	endif;
+				
+	endstate;
+
+endfsm.
+//******************************************************************
+

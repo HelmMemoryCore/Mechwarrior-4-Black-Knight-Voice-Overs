@@ -1,0 +1,694 @@
+
+//*********************************************************************************
+//The below line MUST be changed in order for the script to be considered
+//a unique entity.  The word Patrol must be changed to some other unique identifier
+fsm Mt01_MechEnemy : integer;
+
+//This unit patrols a specific path and attacks anything that comes near it.
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//
+//     Variable Declarations
+//
+//------------------------------------------------------------------
+	var
+	static integer			attackrange; 			// When do I start shooting?
+																
+	static integer			piloting; 				// piloting skill
+	static integer			gunnery; 					// hit chance,
+	static real					mindelay;					// minimum amount of time I will wait between shots once a weapon is reloaded
+	static real					maxdelay;					// maximum amount of time I will wait between shots once a weapon is reloaded
+	static integer 			speed;			 			// What speed so I move at?
+	static integer 			elitelevel; 			// % elite chance, This helps determine tactics, defensive manuevers, opportunity fire
+																				// and other things that would normally be determined by combat experience
+
+ 	static integer			isshotradius;			// how far away from me will I detect an enemy shot.
+	static integer			movetype;					// how will it move down the path?
+
+	static Boolean 			attacksoundplayed;
+	static integer 			attacksound; 			// plays when it first attacks
+	static integer 			deathsound; 			// plays when it dies
+	
+	static integer			mood;							// What is my normal mood?
+	
+	static Boolean			Resumed;					// Have I gotten to the end of the path?
+	static Boolean			reachedendofpath;			// Have I gotten to the end of the path?
+																						// Note: This only gets set if movetype is set to move_nocycle.
+	static integer			path;						 			// what path am I following?
+	static Boolean 			attackersdistractit;	// if FALSE, it won't leave the path, even when things
+																						// are shooting it. It will shoot back. Defaults to true
+																						// Once unit reaches the end of the path, It attacks freely.
+	static Boolean 			Waiter;								// These guys will ambush
+	static Boolean 			Chaser;								// These guys will give chase
+	static Boolean 			Elite;								// Left from other script
+	
+	static integer			teleportNav;					// All the elites will have this value set to a different Nav
+	
+	static ObjectID 		myVehicle;
+//------------------------------------------------------------------
+//
+//     Local Functions
+//
+//------------------------------------------------------------------
+
+function init;
+	code
+	
+	Elite 								= FALSE;
+	Chaser 								= FALSE;
+	Waiter 								= FALSE;
+	 				
+ 	switch (GetMemoryInteger(me,9))
+
+	case 1:															 //madcat_mkii
+	
+		attackrange					= 350;
+		piloting 				 		= 70;				
+		gunnery 				 		= 50;					
+		mindelay 						= 0.5;				
+		maxdelay 						= 1.0;				
+		speed 							= 60;						
+		elitelevel 					= 60;			
+		IsShotRadius 				= 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood 								= neutral_start;
+		path 								= epa_Path_Enemy;
+		ReachedEndOfPath 		= False;
+		Resumed 						= False;
+		Attacksoundplayed 	= False;					
+		
+	endcase;
+		
+	case 2:															 //madcat_mkii_0000
+			
+		attackrange         = 350;
+		piloting            = 70;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Enemy;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		
+	endcase;
+		
+	case 3:						 									//atlas
+		
+		attackrange         = 350;
+		piloting            = 70;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Enemy;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		
+	endcase;
+		
+	case 4:						 									//atlas_0000
+		
+		attackrange         = 350;
+		piloting            = 70;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Enemy;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		
+	endcase;
+		
+	case 5:															 //daishi
+	
+		attackrange         = 350;
+		piloting            = 70;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Enemy;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		
+	endcase;
+		
+	case 6:															 //daishi_0000
+		
+		attackrange         = 350;
+		piloting            = 70;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Enemy;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		
+	endcase;
+	
+	case 11:															//Uziel_Chase1
+	
+		attackrange					= 750;
+		piloting 				 		= 70;				
+		gunnery 				 		= 60;					
+		mindelay 						= 0.5;				
+		maxdelay 						= 1.0;				
+		speed 							= 90;						
+		elitelevel 					= 70;			
+		IsShotRadius 				= 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = TRUE;
+		Mood 								= neutral_start;
+		path 								= epa_Path_Chase;
+		ReachedEndOfPath 		= False;
+		Resumed 						= False;
+		Attacksoundplayed 	= False;					
+		Chaser								=	True;
+		//teleportnav 				= ena_navElite1;								//Kick some Salvage Ass
+		//myVehicle						= eve_Cargotrack1;
+		
+	endcase;
+		
+	case 12:															//Catapult_Chase2
+		
+		attackrange					= 750;
+		piloting 				 		= 70;				
+		gunnery 				 		= 60;					
+		mindelay 						= 0.5;				
+		maxdelay 						= 1.0;				
+		speed 							= 90;						
+		elitelevel 					= 70;			
+		IsShotRadius 				= 80;
+		movetype            = move_nocycle;
+		AttackersDistractIt = TRUE;
+		Mood                = neutral_start;
+		path 								= epa_Path_Chase;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		Chaser								=	True;
+		//teleportnav 				= ena_navElite2;								//Kick some Salvage Ass
+		//myVehicle						= eve_Cargotrack2;
+		
+	endcase;
+		
+	case 13:						 								//Catapult_Chase3
+		
+		attackrange					= 750;
+		piloting 				 		= 70;				
+		gunnery 				 		= 60;					
+		mindelay 						= 0.5;				
+		maxdelay 						= 1.0;				
+		speed 							= 90;						
+		elitelevel 					= 70;			
+		IsShotRadius 				= 80;
+		movetype            = move_nocycle;
+		AttackersDistractIt = TRUE;
+		Mood                = neutral_start;
+		path 								= epa_Path_Chase;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		Chaser								=	True;
+		//teleportnav 				= ena_navElite3;								//Kick some Salvage Ass
+		//myVehicle						= eve_Cargotrack3;
+		
+	endcase;
+		
+	case 21:															//Uller21
+	
+		attackrange					= 750;
+		piloting 				 		= 70;				
+		gunnery 				 		= 60;					
+		mindelay 						= 0.5;				
+		maxdelay 						= 1.0;				
+		speed 							= 70;						
+		elitelevel 					= 70;			
+		IsShotRadius 				= 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = TRUE;
+		Mood 								= neutral_start;
+		path 								= epa_Path_Convoy;
+		ReachedEndOfPath 		= False;
+		Resumed 						= False;
+		Attacksoundplayed 	= False;					
+		Waiter								=	True;
+		//teleportnav 				= ena_navElite1;								//Kick some Salvage Ass
+		//myVehicle						= eve_Cargotrack1;
+		
+	endcase;
+		
+	case 22:															//Uller22
+		
+		attackrange					= 750;
+		piloting 				 		= 70;				
+		gunnery 				 		= 60;					
+		mindelay 						= 0.5;				
+		maxdelay 						= 1.0;				
+		speed 							= 70;						
+		elitelevel 					= 70;			
+		IsShotRadius 				= 80;
+		movetype            = move_nocycle;
+		AttackersDistractIt = TRUE;
+		Mood                = neutral_start;
+		path 								= epa_Path_Convoy;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		Waiter								=	True;
+		//teleportnav 				= ena_navElite2;								//Kick some Salvage Ass
+		//myVehicle						= eve_Cargotrack2;
+		
+	endcase;
+		
+	endswitch;
+ 	
+endfunction;
+
+//------------------------------------------------------------------
+//
+//     Main Code
+//				
+//								
+//------------------------------------------------------------------
+state startState;
+
+	code
+		SetFiringDelay					(me,mindelay,maxdelay);
+		setignorefriendlyfire		(me,true);
+		setisshotradius					(me,isshotradius);
+		setentropymood					(me,mood);
+		setcurmood							(me,mood);
+		setskilllevel						(me,piloting,gunnery,elitelevel);
+		//setsearchlight				(me,on);
+		//startexecute					(me);
+		//setalignment					(me,enemy);
+		
+		if (Elite == True) then
+			shutdown(me);
+			TeleportToHell(me);
+			trans hangout;
+		else
+		if (Chaser == True) then
+			trans ChaseStart;
+		else
+		if (Waiter == True) then
+			shutdown(me);
+			trans WaitStart;
+		else
+			trans AssaultStart;
+		endif;
+		endif;
+		endif;
+endstate;			
+
+state deadState;
+  code
+		if (deathsound <> -1) then	
+			PlaySoundOnce(deathsound);
+		endif;		
+						
+		orderDie;
+endstate;
+
+state WaitStart;
+  code
+		
+		If (Objective2Win == True) then
+			startup(me);
+			if (setmytarget(attackrange)) then
+					trans WaitAttack;
+			endif;
+		endif;
+		
+		If ((isShot (me)))	then
+			startup(me);
+			if (setmytarget(attackrange)) then
+					trans WaitAttack;
+			endif;
+		endif;
+		
+		if ((iswithin(me,(groupobjectid(1)),450)) == true) then
+			startup(me);
+			if (setmytarget(attackrange)) then
+					trans WaitAttack;
+			endif;
+		endif;
+					
+endstate;
+
+	state WaitAttack;
+		
+		code
+		
+		if (LeaveAttackState(attackrange*2)) then
+			orderstopattacking;
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,true);
+				trans patrol;
+			else
+				ordermovelookout;
+			endif;
+		endif;
+		
+			//the ever popular attack order
+			orderAttack (attackersdistractit);
+		
+		//maybe swap targets when I am shot.
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 								
+	endstate;
+  	
+state ChaseStart;
+  code
+		
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				if (orderMoveResumePatrol(path,speed,movetype,true,true) == True) then
+					path	= epa_Path_Convoy;
+					Trans ChasePatrol;
+				endif;
+			else
+				ordermovelookout;
+			endif;
+					
+			if (setmytarget(attackrange)) then
+				orderAttack (False);
+			endif;
+			
+			If (Objective1Win == TRUE) then
+				path	= epa_Path_Convoy;
+				Trans ChasePatrol;
+			endif;
+			
+endstate;
+
+state ChasePatrol;
+  code
+		
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				if (orderMoveResumePatrol(path,speed,movetype,true,true) == True) then
+					Trans ChaseAttack;
+				endif;
+			else
+				ordermovelookout;
+			endif;
+					
+			if (setmytarget(attackrange)) then
+				trans ChaseAttack;
+			endif;
+endstate;
+
+	state ChaseAttack;
+		
+		code
+		
+		if (LeaveAttackState(attackrange*2)) then
+			orderstopattacking;
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,true);
+				trans ChasePatrol;
+			else
+				ordermovelookout;
+			endif;
+		endif;
+		
+			//the ever popular attack order
+			orderAttack (attackersdistractit);
+		
+		//maybe swap targets when I am shot.
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 								
+	endstate;
+  	
+state hangout;
+		
+	var
+		LocPoint my_nav;
+	
+  code
+		
+		If (SalvageAll == true) then
+			startup(me);
+			GetLocation(TeleportNav,my_nav);
+			Teleport(me,my_nav);
+			orderMoveto(path,speed,movetype,true,true);
+  		setTarget(me,myVehicle);
+		endif;
+						
+endstate;
+	
+	state patrol;
+
+  var
+    ObjectID foe;
+
+		code
+
+	//head down the path.  If this has already been done
+	// or if there is no path set then look around.
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+					if ((orderMoveto(path,speed,movetype,true,true)) == TRUE) then
+						reachedendofpath = TRUE;
+					endif; 			
+			else	 		 		
+				ordermovelookout;			
+			endif;
+			
+		//Find me a target
+		if (setmytarget(attackrange)) then
+			trans attack;
+	 	endif;
+			
+	endstate;
+
+	state AssaultStart;
+
+  var
+    ObjectID foe;
+
+		code
+
+	//head down the path.  If this has already been done
+	// or if there is no path set then look around.
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+					if ((orderMoveto(path,speed,movetype,true,true)) == TRUE) then
+						reachedendofpath = TRUE;
+					endif; 			
+			else	 		 		
+				ordermovelookout;			
+			endif;
+			
+		//Find me a target
+		if (setmytarget(attackrange)) then
+			//clearmoveorder(me);
+			trans AssaultAttack;
+	 	endif;
+			
+	endstate;
+
+	state AssaultAttack;
+		
+		code
+		settargetdesirability(ebu_base_turret_tower_Boom,-1);
+		settargetdesirability(GroupObjectId(41),-1);
+		
+		speed = 60;						//Changed from 600 to 60 to keep 'em slow
+		
+		If (BoomTanks == True) then
+			If not (isdead(ebu_fuel_tanks_Boom)) then
+				SetTarget(me,ebu_fuel_tanks_Boom);
+			endif;
+		endif;
+		
+		if (LeaveAttackState(attackrange*2)) then
+			orderstopattacking;
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,true);
+			else
+				trans AssaultStart;
+			endif;
+		endif;
+		
+			//the ever popular attack order
+			orderAttack (attackersdistractit);
+		
+		//maybe swap targets when I am shot.
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 		
+		if groupalldead(GroupObjectId(56)) then
+			movetype	= move_circle;
+			path	= epa_Path_Circle;
+			trans AssaultGaurd;
+		endif;
+								
+	endstate;
+  	
+	state AssaultGaurd;
+
+  var
+    ObjectID foe;
+
+		code
+
+	//head down the path.  If this has already been done
+	// or if there is no path set then look around.
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+					if ((orderMoveto(path,speed,movetype,true,true)) == TRUE) then
+						reachedendofpath = TRUE;
+					endif; 			
+			else	 		 		
+				ordermovelookout;			
+			endif;
+			
+		//Find me a target
+		if (setmytarget(attackrange)) then
+			trans AssaultPlayer;
+	 	endif;
+		
+		If (Objective2Win == True) then
+			if not iswithin(playermech,GroupObjectId(57),1000) then
+				shutdown(me);
+				TeleportToHell(me);
+				trans AssaultHell;
+			endif;
+		endif;
+			
+	endstate;
+
+	state AssaultPlayer;
+		
+		code
+		
+		if (LeaveAttackState(attackrange*2)) then
+			orderstopattacking;
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,true);
+			else
+				trans AssaultGaurd;
+			endif;
+		endif;
+		
+		if (setmytarget(attackrange)) then
+			//the ever popular attack order
+			orderAttack (attackersdistractit);
+	 	endif;
+		
+		//maybe swap targets when I am shot.
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 		
+		If (Objective2Win == True) then
+			if not iswithin(playermech,GroupObjectId(57),1000) then
+				shutdown(me);
+				TeleportToHell(me);
+				trans AssaultHell;
+			endif;
+		endif;
+		
+	endstate;
+  	
+	state AssaultHell;
+		
+		code
+
+		
+	endstate;
+  	
+//------------------------------------------------------------------
+//
+//     attack state : description
+//
+//------------------------------------------------------------------
+	state attack;
+		
+		code
+		settargetdesirability(ebu_base_turret_tower_Boom,-1);
+		settargetdesirability(GroupObjectId(41),-1);
+		
+		speed = 60;						//Changed from 600 to 60 to keep 'em slow
+		
+		If (BoomTanks == True) then
+			If not (isdead(ebu_fuel_tanks_Boom)) then
+				SetTarget(me,ebu_fuel_tanks_Boom);
+			endif;
+		endif;
+		
+		if (LeaveAttackState(attackrange*2)) then
+			orderstopattacking;
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,true);
+			else
+				trans patrol;
+			endif;
+		endif;
+		
+			//the ever popular attack order
+			orderAttack (attackersdistractit);
+		
+		//maybe swap targets when I am shot.
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 								
+	endstate;
+  	
+endfsm.
+//******************************************************************
+

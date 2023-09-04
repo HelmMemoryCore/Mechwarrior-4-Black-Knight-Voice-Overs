@@ -1,0 +1,446 @@
+
+//*********************************************************************************
+//The below line MUST be changed in order for the script to be considered
+//a unique entity.  The word Patrol must be changed to some other unique identifier
+fsm Mt02Salvage : integer;
+
+//This unit patrols a specific path and attacks anything that comes near it.
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//
+//     Variable Declarations
+//
+//------------------------------------------------------------------
+	var
+	static integer			attackrange; 			// When do I start shooting?
+																
+	static integer			piloting; 				// piloting skill
+	static integer			gunnery; 					// hit chance,
+	static real					mindelay;					// minimum amount of time I will wait between shots once a weapon is reloaded
+	static real					maxdelay;					// maximum amount of time I will wait between shots once a weapon is reloaded
+	static integer 			speed;			 			// What speed so I move at?
+	static integer 			elitelevel; 			// % elite chance, This helps determine tactics, defensive manuevers, opportunity fire
+																				// and other things that would normally be determined by combat experience
+
+ 	static integer			isshotradius;			// how far away from me will I detect an enemy shot.
+	static integer			movetype;					// how will it move down the path?
+
+	static Boolean 			attacksoundplayed;
+	static integer 			attacksound; 			// plays when it first attacks
+	static integer 			deathsound; 			// plays when it dies
+	
+	static integer			mood;							// What is my normal mood?
+	
+	static Boolean			Resumed;					// Have I gotten to the end of the path?
+	static Boolean			reachedendofpath;				// Have I gotten to the end of the path?
+																							// Note: This only gets set if movetype is set to move_nocycle.
+	static integer			path;						 				// what path am I following?
+	static integer			path2;						 			// Final Destination Path
+	static Boolean 			attackersdistractit;		// if FALSE, it won't leave the path, even when things
+																							// are shooting it. It will shoot back. Defaults to true
+																							// Once unit reaches the end of the path, It attacks freely.
+
+	static integer			Base;							// Where is my Base?  Am i too good for my HOME?
+	
+	eternal Boolean 		SalvageTime;			// Another Global Trigger
+	static Boolean 			Waiters;					// Teleported (in this case) until condition is met
+	
+	static locpoint			Sav1Point;
+	static locpoint			Sav2Point;
+	static locpoint			Sav3Point;
+	
+	static integer			teleportS1Nav;		//Salvage1 Start
+	static integer			teleportS2Nav;		//Salvage2 Start
+	static integer			teleportS3Nav;		//Salvage3 Start
+	
+	static Boolean			InPos1;							
+	static Boolean 			InPos2;	
+	static Boolean			InPos3;			
+																						
+	static Boolean			InPosition;				//Has the Salvage	vehicle achieved it's goal					 			
+	
+	static Locpoint 		myStart;							//	where I begin the game
+	
+//------------------------------------------------------------------
+//
+//     Local Functions
+//
+//------------------------------------------------------------------
+
+function init;
+	code
+	
+	//These variables should not be changed by the designer without good reason
+		reachedendofpath 		= FALSE;						 			//false
+		attacksoundplayed 	= FALSE;									//false
+		attacksound 				= -1;
+		deathsound 					= -1;
+		SalvageTime			 		= FALSE;									//Global Trigger
+		Waiters 						= TRUE;										//Need to wait in hell until it is time to salvage
+	
+		InPosition					= False;
+		
+		teleportS1Nav				= ena_Nav_Salvage1;
+		teleportS2Nav				= ena_Nav_Salvage2;
+		teleportS3Nav				= ena_Nav_Salvage3;
+		
+	//Use this to set different values for different units using the same brain	
+	switch (GetMemoryInteger(me,9))
+
+		case 1:															 //					Cargotrack 1
+		
+		attackrange         = 350;
+		piloting            = 50;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype            = move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Salvage1;
+		path2								= epa_Path_Salvage1;
+		InPos1							= False;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		
+		endcase;
+		
+		case 2:																 //					Cargotrack 2
+				
+		attackrange         = 350;
+		piloting            = 50;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype            = move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Salvage2;
+		path2								= epa_Path_Salvage2;
+		InPos2							= False;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		
+		endcase;
+		
+		case 3:																 //					Cargotrack 3
+				
+		attackrange         = 350;
+		piloting            = 50;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype            = move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Salvage3;
+		path2								= epa_Path_Salvage3;
+		InPos3							= False;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		
+		endcase;
+
+	endswitch;
+
+endfunction;
+
+//------------------------------------------------------------------
+//
+//     Main Code
+//
+//------------------------------------------------------------------
+state startState;
+
+	code
+		
+			//getlocation(teleportS1Nav,Sav1Point);
+			//getlocation(teleportS2Nav,Sav2Point);
+			//getlocation(teleportS3Nav,Sav3Point);
+			
+			//getlocation(ena_NavFL,LocFL);
+			//getlocation(ena_NavFR,LocFR);
+			//getlocation(ena_NavBL,LocBL);
+			//getlocation(ena_NavBR,LocBR);
+		
+		SetFiringDelay					(me,mindelay,maxdelay);
+		setignorefriendlyfire		(me,true);
+		setisshotradius					(me,isshotradius);
+		setentropymood					(me,mood);
+		setcurmood							(me,mood);
+		setskilllevel						(me,piloting,gunnery,elitelevel);
+		//setsearchlight				(me,on);
+		//startexecute					(me);
+		//setalignment					(me,enemy);
+		
+		GetLocation(me,mystart);
+		
+		if (waiters == true) then
+			shutdown(me);
+			trans hellstate;
+		else
+			trans patrol;
+		endif;
+
+endstate;			
+
+state deadState;
+  code
+		if (deathsound <> -1) then	
+			PlaySoundOnce(deathsound);
+		endif;
+					
+		orderDie;
+endstate;
+
+state hellState;
+  code
+		
+		TeleportToHell(me);		
+			trans SalvageWait;
+			
+endstate;
+
+state Hangout;
+	var
+		LocPoint my_nav;
+	
+  code
+
+		shutdown(me);
+	
+	//Different Teleport Locations For Each Vehicle
+	switch (GetMemoryInteger(me,9))
+	
+		case 1:						//
+			if Objective1Win == TRUE then
+					startup(me);
+					GetLocation(teleportS1Nav,my_nav);
+					Teleport(me,my_nav);
+				trans Position;
+			endif;
+		endcase;
+		
+		case 2:						//
+			if Objective2Win == TRUE then
+					startup(me);
+					GetLocation(teleportS2Nav,my_nav);
+					Teleport(me,my_nav);
+				trans Position;
+			endif;
+		endcase;
+		
+		case 3:						//
+			if Objective3Win == TRUE then
+					startup(me);
+					GetLocation(teleportS3Nav,my_nav);
+					Teleport(me,my_nav);
+				trans Position;
+			endif;
+		endcase;
+	
+	endswitch;
+
+endstate;
+
+state SalvageWait;
+  code
+		
+		If (SalvageStartAll	== true) then
+			startup(me);
+			Teleport(me,myStart);
+			orderMoveto(path,speed,movetype,true,true);
+			trans SalvageDuty;
+		endif;
+						
+endstate;
+	
+state SalvageDuty;
+  code
+		
+		If orderMoveto(path,speed,movetype,true,true)	then
+			shutdown(me);
+			trans SalvageDone;
+		endif;
+						
+endstate;
+	
+state SalvageDone;
+  code
+		
+						
+endstate;
+	
+	state Position;
+
+  var
+
+		ObjectID foe;
+
+		code
+	
+	//Have the Salvage Vehicles Started their job?
+	switch (GetMemoryInteger(me,9))
+	
+		case 1:						//
+		
+		SalvageStart1 = True;
+		
+		endcase;
+		
+		case 2:						//
+		
+		SalvageStart2 = True;
+		
+		endcase;
+		
+		case 3:						//
+		
+		SalvageStart3 = True;
+		
+		endcase;
+	
+	endswitch;	
+	
+	//Head down the path.  If this has already been done
+	//or if there is no path set then look around
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+					if ((orderMoveto(path,speed,movetype,true,true)) == TRUE) then
+						reachedendofpath = TRUE;
+						trans WaitClear;
+					endif; 			
+			//else	 		 		
+			//	OrderMoveToObject((playermech),200);			
+			endif;
+			
+	endstate;
+
+	state WaitClear;
+
+  var
+
+		ObjectID foe;
+
+		code
+	
+	//Head down the path.  If this has already been done
+	//or if there is no path set then look around
+			if ((path2 <> -1) and (reachedendofpath == TRUE)) then
+					if ((orderMoveto(path2,speed,movetype,true,true)) == TRUE) then
+						InPosition = TRUE;
+						trans LoadingBooty;
+					endif; 			
+			//else	 		 		
+			//	OrderMoveToObject((playermech),200);			
+			endif;
+			
+	endstate;
+
+	
+state LoadingBooty;
+  code
+
+		shutdown(me);
+	
+	//Have the Salvage Vehicles done their job?
+	switch (GetMemoryInteger(me,9))
+	
+		case 1:						//
+		
+		Salvage1 = True;
+		
+		endcase;
+		
+		case 2:						//
+		
+		Salvage2 = True;
+		
+		endcase;
+		
+		case 3:						//
+		
+		Salvage3 = True;
+		
+		endcase;
+	
+	endswitch;	
+
+endstate;
+
+	
+	state patrol;
+
+  var
+
+		ObjectID foe;
+
+		code
+
+	//Head down the path.  If this has already been done
+	//or if there is no path set then look around
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+					if ((orderMoveto(path,speed,movetype,true,true)) == TRUE) then
+						reachedendofpath = TRUE;
+					endif; 			
+			else	 		 		
+				OrderMoveToObject((playermech),200);			
+			endif;
+			
+		/*Find me a target
+			if (setmytarget(attackrange)) then
+				trans attack;
+			endif;
+		*/	
+	endstate;
+
+//------------------------------------------------------------------
+//
+//     attack state : description
+//
+//------------------------------------------------------------------
+	state attack;
+		
+		code
+			
+		if (LeaveAttackState(attackrange*3/2)) then
+			orderstopattacking;
+			orderMoveResumePatrol(path,speed,movetype,true,attackersdistractit);
+			trans patrol;
+		endif;
+		
+		//the ever popular attack order
+    orderAttack (attackersdistractit);
+					
+	endstate;
+
+endfsm.
+//******************************************************************
+

@@ -1,0 +1,320 @@
+
+//------------------------------------------------------------------
+// NOTE: The fsm name below MUST be changed in order for the
+// script to be considered a unique entity!
+//------------------------------------------------------------------
+
+fsm skirmish : integer;
+
+
+//------------------------------------------------------------------
+// Skirmish:
+//   These are the Rebels, Rogues, and Dressari fights.
+//------------------------------------------------------------------
+
+
+
+//------------------------------------------------------------------
+//     Constants
+//------------------------------------------------------------------
+
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//     Types
+//------------------------------------------------------------------
+
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//     Variables
+//------------------------------------------------------------------
+
+	var
+    
+    // Standard Mech and Vehicle variables
+        static integer			attackRange;		// At what range do I start shooting?
+		static integer			withdrawRange;		// At what range do I withdraw from combat completely?
+                                                    //
+		static integer			piloting;			// Piloting skill
+		static integer			gunnery;			// Gunnery skill/chance to hit
+		static real				minDelay;			// Minimum amount of time I will wait between shots once a weapon is reloaded
+		static real				maxDelay;			// Maximum amount of time I will wait between shots once a weapon is reloaded
+		static integer 			eliteLevel;			// Elite level.  This helps determine tactics, defensive manuevers, opportunity fire
+													// and other things.  It indicates a general level of combat experience.
+		static integer			attackThrottle;		// My attack throttle
+		static integer			findTypes;			// What kind of enemies to look for
+        static integer			path;	            // What path to take.
+        static integer			speed;	            // Speed on the path.
+                                                    //
+ 		static integer			isShotRadius;		// How far away from me will I detect an enemy shot?
+                                                    //
+		static integer 			attackSound;		// The attack sound I play when I first attack
+		static integer 			deathSound;			// The sound I play when I die
+		                                            //
+		static integer			mood;				// My default 
+		static integer			takeOffDistance;	// My take-off distance if I'm an airplane (ignored if not an airplane)
+    //
+		
+        static integer			groupNumber;		// What's my group -- i.e. I will use GroupObjectID(groupNumber) to identify my group
+		static integer			formationType;		// What kind of formation am I in?
+		static integer			formationDensity;	// How densely are we packed?
+		static integer			moveType;			// How I move along the path
+        static locpoint         starter;            // Where the Mech starts
+        static boolean          canbeseen;          // The Mech is now visible
+        static integer          myobject;           // This is where the Mech goes when not attacking
+        static boolean          warstarts;          // They will start duking it out at this range
+        static boolean          hidden;             // This Mech should be toggled to visible after a certain point
+        static boolean          imarebel;           // I am a rebel
+
+//------------------------------------------------------------------
+//     Init: my initialization function
+//------------------------------------------------------------------
+
+function Init;
+	code
+		// script-specific variables
+		attackRange		= 550;
+		withdrawRange	= attackRange * 3 / 2;
+		groupNumber		= 0;
+		path			= -1;
+		moveType		= move_nocycle;
+		speed			= 90;
+		formationType	= 1;
+		formationDensity= formtype_sparse;
+		takeOffDistance	= 150;
+
+		// driver settings
+		piloting		= 90;
+		gunnery			= 90;	// reduced from 130 by Fifield
+		minDelay		= 0.2;
+		maxDelay		= 0.6;
+		eliteLevel		= 50;  // Reduced from 90 by fifield
+		attackThrottle	= 90;
+		isShotRadius	= 120;
+		attackSound		= -1; // no sound
+		deathSound		= -1; // no sound
+		mood			= NEUTRAL_START;
+		findTypes		= FT_DEFAULT;
+
+//      if (getmemoryinteger(me,9)==1) then
+//          path = epa_EnemyConvoyPath
+//      endif;
+
+endfunction;
+
+//------------------------------------------------------------------
+//	StartState: my initial state
+//------------------------------------------------------------------
+
+state StartState;
+
+	code
+		SetFiringDelay			(ME,minDelay,maxDelay);
+		SetIgnoreFriendlyFire	(ME,true);
+		SetIsShotRadius			(ME,isShotRadius);
+		SetEntropyMood			(ME,mood);
+		SetCurMood				(ME,mood);
+		SetSkillLevel			(ME,piloting,gunnery,eliteLevel);
+		SetAttackThrottle		(ME,attackThrottle);
+
+        GetLocation(me,starter);
+
+        switch (GetMemoryInteger(me,9))
+        
+            case 0:
+                myobject    = ena_Nav_Alpha;
+                imarebel    = true;
+                path        = epa_rebelsgo;
+                trans FollowPathState;
+            endcase;
+            
+            case 1:
+                myobject    = ena_Nav_Beta;
+                if (GetMemoryInteger(me,8)==1) then
+                    shutdown(me);
+                else
+                    shutdown(me);
+                    teleporttohell(me);
+                endif;
+                trans waiting1;
+            endcase;
+                
+            case 2:
+                myobject    = ena_Nav_Gamma;
+                SetSensorVisibility(me,false);
+                teleporttohell(me);
+                hidden = true;
+                trans waiting2;
+            endcase;
+
+            case 3:
+                myobject    = ena_Nav_Gamma;
+                SetSensorVisibility(me,false);
+                teleporttohell(me);
+        		attackRange		= 600;
+                hidden = true;
+                trans waiting3;
+            endcase;
+            
+        endswitch;
+        
+endstate;
+
+//------------------------------------------------------------------
+//	Waiting1: They wait to appear until Obj2 is met
+//------------------------------------------------------------------
+
+state Waiting1;
+	code
+
+        if (GetMemoryInteger(me,8)==1) then
+            if (betago) then
+                startup(me);
+                trans FollowPathState;
+            endif;
+        endif;
+
+        if (obj2) then
+            teleport(me,starter);
+            startup(me);
+            trans FollowPathState;
+        endif;
+
+endstate;
+
+//------------------------------------------------------------------
+//	Waiting2: They wait to appear until Obj3 is met
+//------------------------------------------------------------------
+
+state Waiting2;
+	code
+
+        if (obj2) then
+            teleport(me,starter);
+            startup(me);
+            trans FollowPathState;
+        endif;
+
+endstate;
+
+//------------------------------------------------------------------
+//	Waiting3: They wait to appear until Obj5 is met
+//------------------------------------------------------------------
+
+state Waiting3;
+	code
+
+        if (counterstrike) then
+            teleport(me,starter);
+            startup(me);
+            trans gotoplayer;
+        endif;
+
+endstate;
+
+//------------------------------------------------------------------
+//	FollowPathState: follow our path, but keep an eye out for enemies
+//------------------------------------------------------------------
+
+state FollowPathState;
+	code
+
+        if (imarebel) then
+            if (obj2) then
+                trans gotopath;
+            endif;
+        endif;
+
+        if (FindEnemy(attackRange,findTypes)) then
+			trans AttackState;
+		endif;
+
+        if (not warstarts) then
+            if (iswithin(playermech,ena_Nav_Beta,700)) then
+                SetTargetDesirability(GroupObjectID(21),50);
+                warstarts=true;
+            endif;
+        endif;
+        
+        if (myobject <> 0) then
+//            OrderMovetoObject(myobject,100);
+            // OrderMoveTo(path,speed,move_nocycle,false,false);
+            // OrderFormationMove((groupobjectid(groupNumber)),path,speed,moveType,formationType,formationDensity,false);
+//        else
+		    OrderMoveLookOut;
+        endif;
+        
+endstate;
+
+//------------------------------------------------------------------
+//	Gotoplayer: Run Over to the Player
+//------------------------------------------------------------------
+
+state Gotoplayer;
+	code
+        		
+        if (FindEnemy(attackRange,findTypes)) then
+			trans AttackState;
+		endif;
+
+		ordermovetoobject(playermech,600);
+		
+endstate;
+
+state Gotopath;
+	code
+        		
+        if (FindEnemy(attackRange,findTypes)) then
+			trans AttackState;
+		endif;
+
+		OrderMoveTo(path,speed,move_nocycle,false,false);
+		
+endstate;
+
+//------------------------------------------------------------------
+//	AttackState: attack my target
+//------------------------------------------------------------------
+
+state AttackState;
+	code
+		if (LeaveAttackState(withdrawRange)) then
+			OrderStopAttacking;
+			SetTarget(ME,NO_UNIT);
+			trans FollowPathState;
+		endif;
+        
+        if (hidden) then
+            setsensorvisibility(me,true);
+            hidden = false;
+        endif;
+
+		if (attackSound <> -1) then	
+			PlaySoundOnce(attackSound);
+		endif;
+
+		OrderAttack(true);
+
+endstate;
+
+//------------------------------------------------------------------
+//	DeadState: OK, I kicked the bucket.
+//------------------------------------------------------------------
+
+state DeadState;
+	code
+		if (deathSound <> -1) then	
+			PlaySoundOnce(deathSound);
+		endif;		
+
+		orderDie;
+
+endstate;
+
+
+endfsm.
+

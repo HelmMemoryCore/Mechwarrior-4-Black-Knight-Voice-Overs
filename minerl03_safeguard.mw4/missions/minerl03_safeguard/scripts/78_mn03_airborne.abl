@@ -1,0 +1,330 @@
+
+//*********************************************************************************
+//The below line MUST be changed in order for the script to be considered
+//a unique entity.  The word Patrol must be changed to some other unique identifier
+fsm Mn03_Airborne : integer;
+
+//This unit patrols a specific path and attacks anything that comes near it.
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//
+//     Variable Declarations
+//
+//------------------------------------------------------------------
+	var
+	static integer			attackrange; 			// When do I start shooting?
+																
+	static integer			piloting; 				// piloting skill
+	static integer			gunnery; 				// hit chance,
+	static real				mindelay;				// minimum amount of time I will wait between shots once a weapon is reloaded
+	static real				maxdelay;				// maximum amount of time I will wait between shots once a weapon is reloaded
+	static integer 			speed;			 		// What speed so I move at?
+	static integer 			elitelevel; 			// % elite chance, This helps determine tactics, defensive manuevers, opportunity fire
+    static integer			attackThrottle;		    // My attack throttle
+													// and other things that would normally be determined by combat experience
+
+ 	static integer			isshotradius;			// how far away from me will I detect an enemy shot.
+	static integer			movetype;				// how will it move down the path?
+
+	static Boolean 			attacksoundplayed;
+	static integer 			attacksound; 			// plays when it first attacks
+	static integer 			deathsound; 			// plays when it dies
+	
+	static integer			mood;					// What is my normal mood?
+	
+	static Boolean			Resumed;				// Have I gotten to the end of the path?
+	static Boolean			reachedendofpath;		// Have I gotten to the end of the path?
+													// Note: This only gets set if movetype is set to move_nocycle.
+	static integer			path;					// what path am I following?
+	static Boolean 			attackersdistractit;	// if FALSE, it won't leave the path, even when things
+													// are shooting it. It will shoot back. Defaults to true
+													// Once unit reaches the end of the path, It attacks freely.
+
+	static integer			Base;					// Where is my Base?  Am i too good for my HOME?
+	
+	static Boolean 			Secret;					// They are Powered down in Ambush
+	static Boolean 			Elite;					// These guys go to hell -  and back
+	
+	static integer			takeOffDistance;	    // My take-off distance if I'm an airplane (ignored if not an airplane)
+	
+	static Locpoint 		myStart;				//	where I begin the game
+	static Boolean			MyTrigger;				// What Global Boolean Sets me off?
+	eternal Boolean			FlyPlayed;				// What Global Boolean Sets me off?
+//------------------------------------------------------------------
+//
+//     Local Functions
+//
+//------------------------------------------------------------------
+
+function init;
+	code
+	
+	//These variables should not be changed by the designer without good reason
+		
+		attackrange         = 950;
+        AttackThrottle      = 100;
+		piloting            = 50;
+		gunnery             = 65;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype            = move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 				= -1;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		takeOffDistance		= 150;
+		attacksound 		= -1;
+		deathsound 			= -1;
+		Secret 				= FALSE;									//They are not in hiding
+		Elite 				= FALSE;
+		FlyPlayed 			= FALSE;
+	
+		takeOffDistance		= 150;
+	
+	//Use this to set different values for different units using the same brain	
+	switch (GetMemoryInteger(me,9))
+
+		case 20:							//	Air Responce When 1 of group11 isdead
+          	speed               = 200;
+			attackrange         = 150;
+			path 				= -1;
+			MyTrigger			= NavDReached;
+			Elite 				= TRUE;
+		endcase;
+		
+		case 50:							//	Attacks Obj_MineHQ when convoy reaches Beta
+			path 				= -1;
+			MyTrigger			= BetaBombers;
+			Elite 				= TRUE;
+		endcase;
+		
+		case 52:							//	Attacks Obj_MineHQ 1 min after convoy = Gamma
+			path 				= -1;
+			MyTrigger			= GammaBombers;			//WAS Objective3Win THEN TurretKilla
+			Elite 				= TRUE;
+		endcase;
+		
+	endswitch;
+
+endfunction;
+
+//------------------------------------------------------------------
+//
+//     Main Code
+//
+//------------------------------------------------------------------
+state startState;
+
+	code
+		
+		SetFiringDelay					(me,mindelay,maxdelay);
+		setignorefriendlyfire		    (me,true);
+		setisshotradius					(me,isshotradius);
+		setentropymood					(me,mood);
+		setcurmood						(me,mood);
+		setskilllevel					(me,piloting,gunnery,elitelevel);
+		SetAttackThrottle		        (ME,attackThrottle);
+		//setsearchlight				(me,on);
+		//startexecute					(me);
+		//setalignment					(me,enemy);
+		
+
+		GetLocation(me,mystart);
+		
+	if (orderTakeOff(takeOffDistance) == true) then	
+		if (secret == true) then
+			shutdown(me);
+			trans hangout;
+		endif;
+		
+		if (Elite == True) then
+			shutdown(me);
+			TeleportToHell(me);
+			trans hangoutELITE;
+		else
+			trans patrol;
+		endif;
+	endif;
+
+endstate;			
+
+state deadState;
+  code
+		
+		orderDie;
+		
+endstate;
+
+state Hangout;
+  code
+
+				If ((isShot (me)))	then
+					startup(me);
+					trans patrol;
+				endif;
+				
+				if ((iswithin(me,(groupobjectid(1)),200)) == true) then
+					startup(me);
+					trans patrol;
+				endif;
+						
+				If (MyTrigger == true) then
+					startup (me);
+					trans patrol;
+				endif;
+
+endstate;
+
+state hangoutELITE;
+  code
+		
+		If (MyTrigger == true) then
+			startup(me);
+			Teleport(me,myStart);
+				if (orderTakeOff(takeOffDistance) == true) then	
+					OrderMoveToObject((playermech),200);			
+					setTarget(me,playermech);
+					trans patrol;
+				endif;
+		endif;
+						
+	switch (GetMemoryInteger(me,9))
+
+		case 20:													//Air Responce When 1 of group11 isdead
+			MyTrigger						= NavDReached;
+		endcase;
+		
+		case 50:													//Attacks Obj_MineHQ when convoy reaches Beta
+			MyTrigger						= BetaBombers;
+		endcase;
+		
+		case 52:													//Attacks Obj_MineHQ 1 min after convoy = Gamma
+			MyTrigger						= GammaBombers;			//WAS Objective3Win THEN TurretKilla
+		endcase;
+		
+	endswitch;
+
+endstate;
+	
+	state patrol;
+
+  var
+
+		ObjectID foe;
+
+		code
+	
+	//Head down the path.  If this has already been done
+	//or if there is no path set then look around
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+					if ((orderMoveto(path,speed,movetype,true,true)) == TRUE) then
+						reachedendofpath = TRUE;
+					endif; 			
+			else	 		 		
+				OrderMoveToObject((playermech),300);			
+			endif;
+			
+	if (FlyPlayed == False) then
+		if (GetMemoryInteger(me,9) == 20) then
+			if iswithin(me,playermech,600) then
+				PlayLanceMateSound("vox\op1\mi3\flyby",1);							// ISA
+			    StartMusic("Music\Sander",0.5,3.0,50);
+				FlyPlayed =	TRUE;
+			endif;
+		endif;
+	endif;
+		
+		//Find me a target
+			if (setmytarget(attackrange)) then
+				trans attack;
+			endif;
+			
+	endstate;
+
+//------------------------------------------------------------------
+//
+//     attack state : description
+//
+//------------------------------------------------------------------
+	state attack;
+		
+		code
+			
+		if (LeaveAttackState(attackrange*3/2)) then
+			orderstopattacking;
+			if (path <> -1) then
+				orderMoveResumePatrol(path,speed,movetype,true,attackersdistractit);
+				trans patrol;
+			else	 		 		
+				OrderMoveToObject((playermech),200);			
+				trans patrol;
+			endif;
+		endif;
+		
+		//the ever popular attack order
+    orderAttack (attackersdistractit);
+		
+		//maybe swap targets when I am shot
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 			
+		if (GetMemoryInteger(me,9) == 20) then
+			trans Aidios;
+		else
+			if missionwon == true then
+				trans Aidios;
+			endif;
+		endif;
+							
+	endstate;
+
+	state Aidios;
+		
+		code
+		speed               = 200;
+
+			PlayVoiceOverOnce("vox\op1\mi3\flyby", TALKER_ERI);		//
+			
+			orderMovetoObject(ena_FlankerHell,speed);
+ 			
+			if iswithin(me,ena_FlankerHell,250) then
+				shutdown(me);
+				teleporttohell(me);
+				trans deadstate;
+			endif;
+			orderMovetoObject(ena_FlankerHell,speed);
+ 			
+			if iswithin(me,ena_FlankerHell,250) then
+				shutdown(me);
+				teleporttohell(me);
+				trans deadstate;
+			endif;
+								
+	endstate;
+	
+
+endfsm.
+//******************************************************************
+

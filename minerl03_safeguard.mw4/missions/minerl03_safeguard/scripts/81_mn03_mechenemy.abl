@@ -1,0 +1,448 @@
+
+//*********************************************************************************
+//The below line MUST be changed in order for the script to be considered
+//a unique entity.  The word Patrol must be changed to some other unique identifier
+fsm Mn03_MechEnemy : integer;
+
+//This unit patrols a specific path and attacks anything that comes near it.
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//
+//     Variable Declarations
+//
+//------------------------------------------------------------------
+	var
+	static integer			attackrange; 			// When do I start shooting?
+																
+	static integer			piloting; 				// piloting skill
+	static integer			gunnery; 					// hit chance,
+	static real					mindelay;					// minimum amount of time I will wait between shots once a weapon is reloaded
+	static real					maxdelay;					// maximum amount of time I will wait between shots once a weapon is reloaded
+	static integer 			speed;			 			// What speed so I move at?
+	static integer			attackThrottle;
+	static integer 			elitelevel; 			// % elite chance, This helps determine tactics, defensive manuevers, opportunity fire
+																				// and other things that would normally be determined by combat experience
+
+ 	static integer			isshotradius;			// how far away from me will I detect an enemy shot.
+	static integer			movetype;					// how will it move down the path?
+
+	static Boolean 			attacksoundplayed;
+	static integer 			attacksound; 			// plays when it first attacks
+	static integer 			deathsound; 			// plays when it dies
+	
+	static integer			mood;							// What is my normal mood?
+	
+	static Boolean			Resumed;					// Have I gotten to the end of the path?
+	static Boolean			reachedendofpath;			// Have I gotten to the end of the path?
+																						// Note: This only gets set if movetype is set to move_nocycle.
+	static integer			path;						 			// what path am I following?
+	static Boolean 			attackersdistractit;	// if FALSE, it won't leave the path, even when things
+																						// are shooting it. It will shoot back. Defaults to true
+																						// Once unit reaches the end of the path, It attacks freely.
+	static Boolean 			Chaser;								// These guys will give chase
+	static Boolean 			Elite;								// Left from other script
+	
+	static integer			teleportNav;					// All the elites will have this value set to a different Nav
+	
+	static ObjectID 		myVehicle;
+	static Locpoint 		myStart;							//	where I begin the game
+	static Boolean			MyTrigger;				// What Global Boolean Sets me off?
+	static Boolean			BetaAlert; 				// Have ambush at Beta VO's been played?
+
+//------------------------------------------------------------------
+//
+//     Local Functions
+//
+//------------------------------------------------------------------
+
+function TriggerSet;
+	code
+ 	
+	switch (GetMemoryInteger(me,9))
+
+	case 11:															//Mechs From the South
+	
+		MyTrigger						= NavBReached;
+		
+	endcase;
+		
+	case 25:						 									// Jump from behind the cresent mountain and attack
+		
+		MyTrigger						= NavBReached;
+		
+	endcase;
+		
+	case 60:						 									// Jump from the crater to take out turrets and towers
+		
+		MyTrigger						= NavDReached;
+		//MyTrigger						= TurretKilla;
+		
+	endcase;
+		
+	case 80:															 // Backup = Two Lances of Mechs that attack the HQ
+	
+		MyTrigger						= BackupMechs;
+		
+	endcase;
+ 	
+	endswitch;
+
+endfunction;
+
+function init;
+	code
+	
+	Elite 								= FALSE;
+	 				
+ 	switch (GetMemoryInteger(me,9))
+
+	case 11:															//Mechs From the South
+	
+		attackrange					= 750;
+		piloting 				 	= 50;				
+		gunnery 				 	= 40;					
+		mindelay 					= 0.5;				
+		maxdelay 					= 1.0;				
+		speed 						= 50;						
+		attackThrottle				= 60;
+		elitelevel 					= 45;				 //was 60 8/19
+		IsShotRadius 				= 80;
+		movetype 					= move_nocycle;
+		AttackersDistractIt 		= True;
+		Mood 						= neutral_start;
+		path 						= epa_Path_Initial;
+		ReachedEndOfPath 			= False;
+		Resumed 					= False;
+		Attacksoundplayed 			= False;					
+		MyTrigger					= NavBReached;
+		
+	endcase;
+		
+	case 80:															 // Backup = Two Lances of Mechs that attack the HQ
+	
+		attackrange         = 1000;
+		piloting            = 70;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		attackThrottle		= 50;
+		elitelevel          = 45;           //was 60 8/19
+		IsShotRadius        = 80;
+		movetype 			= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 				= -1;						 //they target HQ
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		Elite 				= TRUE;
+		MyTrigger			= BackupMechs;
+		
+	endcase;
+/*		
+	
+	case 25:						 									// Jump from behind the cresent mountain and attack
+		
+		attackrange         = 1000;
+		piloting            = 70;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= -1;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		Elite 							= TRUE;
+		MyTrigger						= NavBReached;
+		
+	endcase;
+		
+	case 60:						 									// Jump from the crater to take out turrets and towers
+		
+		attackrange         = 1000;
+		piloting            = 70;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= -1;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		Elite 							= TRUE;
+		MyTrigger						= NavDReached;
+		//MyTrigger						= TurretKilla;
+		
+	endcase;
+		
+	case 86:															 // Sneaky Shadowcat who trys to take out the HQ in the confusion
+		
+		attackrange         = 1000;
+		piloting            = 70;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= -1;							//targets HQ
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		Elite 							= TRUE;
+		MyTrigger						= SneakyResponse;
+		
+	endcase;
+*/		
+	endswitch;
+ 	
+endfunction;
+
+//------------------------------------------------------------------
+//
+//     Main Code
+//				
+//								
+//------------------------------------------------------------------
+state startState;
+
+	code
+		SetFiringDelay					(me,mindelay,maxdelay);
+		setignorefriendlyfire		(me,true);
+		setisshotradius					(me,isshotradius);
+		setentropymood					(me,mood);
+		setcurmood							(me,mood);
+		setskilllevel						(me,piloting,gunnery,elitelevel);
+		setattackThrottle			(me,attackThrottle);
+		//setsearchlight				(me,on);
+		//startexecute					(me);
+		//setalignment					(me,enemy);
+		
+		GetLocation(me,mystart);
+		
+		if (Elite == True) then
+			shutdown(me);
+			TeleportToHell(me);
+			trans hangoutELITE;
+		else
+			shutdown(me);
+			trans ShutdownMechs;
+		endif;
+
+endstate;			
+
+state deadState;
+  code
+						
+		orderDie;
+endstate;
+
+state hangoutELITE;
+  code
+		
+		If (BackupMechs == true) then  // Ferret change here - It was MyTrigger instead of BackupMechs, I don't think that function worked
+			startup(me);
+			Teleport(me,myStart);
+			if (path <> -1) then
+				orderMoveto(path,speed,movetype,true,true);
+				setTarget(me,playermech);
+				trans patrol;
+			else
+            if not isdead(ebu_Obj_MineHQ) then	 		 		
+                OrderMoveToObject(ebu_Obj_MineHQ,120);
+                SetTarget(me,playermech);
+            endif;
+			    trans patrol;
+			endif;
+		endif;
+						
+endstate;
+	
+	state ShutdownMechs;
+		
+		code
+		
+		TriggerSet;			
+	
+		If (MyTrigger == true) then  // Ferret change here - It was MyTrigger instead of BackupMechs, I don't think that function worked
+			startup(me);
+			if (path <> -1) then
+				orderMoveto(path,speed,movetype,true,true);
+				setTarget(me,playermech);
+				trans patrol;
+			else
+            if not isdead(ebu_Obj_MineHQ) then	 		 		
+                OrderMoveToObject(ebu_Obj_MineHQ,120);
+                SetTarget(me,playermech);
+            endif;
+			trans patrol;
+			endif;
+		endif;
+ 								
+		If ((isShot (me)))	then
+			startup(me);
+			if (path <> -1) then
+				orderMoveto(path,speed,movetype,true,true);
+				setTarget(me,playermech);
+				trans patrol;
+			else
+            if not isdead(ebu_Obj_MineHQ) then	 		 		
+                OrderMoveToObject(ebu_Obj_MineHQ,120);
+                SetTarget(me,playermech);
+            endif;
+				trans patrol;
+			endif;
+		endif;
+				
+	if ((iswithin(me,(groupobjectid(1)),200)) == true) then
+	    startup(me);
+			if (path <> -1) then
+		        orderMoveto(path,speed,movetype,true,true);
+                setTarget(me,playermech);
+                trans patrol;
+        	else
+            if not isdead(ebu_Obj_MineHQ) then	 		 		
+                OrderMoveToObject(ebu_Obj_MineHQ,120);
+                SetTarget(me,playermech);
+            endif;
+                trans patrol;
+			endif;
+	endif;
+	endstate;
+	
+	state patrol;
+
+  var
+    ObjectID foe;
+
+		code
+
+			
+        // Ferret wrote this if block in order to fix a bug
+        if (GetMemoryInteger(me,9)==80) then
+            if not isdead(ebu_Obj_MineHQ) then	 		 		
+                OrderMoveToObject(ebu_Obj_MineHQ,120);
+                SetTarget(me,playermech);
+            endif;
+        endif;
+        // End of Ferret code
+		
+		//Fifeld wrtoe this block to trigger VO at Beta ambush
+		if (not BetaAlert) then
+			if (GetMemoryInteger(me,9)==11) then
+				PlayVoiceOverOnce("vox\op1\mi3\ambush", TALKER_ERI);
+				PlayVoiceOverOnce("vox\op1\mi3\ambush", TALKER_MAN);
+				BetaAlert = true;
+			endif;
+		endif;
+		// End of Fifield block
+		
+		//head down the path.  If this has already been done
+		// or if there is no path set then look around.
+			if ((path <> -1) and (reachedendofpath == FALSE) and (GetMemoryInteger(me,9)<>80)) then  // Added GetMemory -Ferret
+					if ((orderMoveto(path,speed,movetype,true,true)) == TRUE) then
+						reachedendofpath = TRUE;
+					endif; 			
+			else
+            if not isdead(ebu_Obj_MineHQ) then	 		 		
+                OrderMoveToObject(ebu_Obj_MineHQ,120);
+			endif;
+			endif;
+			
+		//Find me a target
+		if (setmytarget(attackrange)) then
+			trans attack;
+	 	endif;
+	
+	endstate;
+
+//------------------------------------------------------------------
+//
+//     attack state : description
+//
+//------------------------------------------------------------------
+	state attack;
+		
+		code
+		
+		speed = 600;						//Changed from 600 to 60 to keep 'em slow
+		
+		if (LeaveAttackState(attackrange*2)) then
+			orderstopattacking;
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,true);
+			else
+				trans patrol;
+			endif;
+		endif;
+		
+		//the ever popular attack order
+    orderAttack (attackersdistractit);
+		
+		//maybe swap targets when I am shot.
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 								
+	endstate;
+  	
+		state GiveChase;
+		
+		code
+
+		speed = 60;						//Changed from 600 to 60 to keep 'em slow
+		
+		if (LeaveAttackState(attackrange*3)) then
+			orderstopattacking;
+			
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,true);
+			else
+				trans patrol;
+			endif;
+		endif;
+		
+		//the ever popular attack order
+    orderAttack (attackersdistractit);
+				
+		//maybe swap targets when I am shot.
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 								
+	endstate;
+
+endfsm.
+//******************************************************************
+

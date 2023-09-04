@@ -1,0 +1,542 @@
+
+//*********************************************************************************
+//The below line MUST be changed in order for the script to be considered
+//a unique entity.  The word Patrol must be changed to some other unique identifier
+fsm Mn02_MechEnemy : integer;
+
+//This unit patrols a specific path and attacks anything that comes near it.
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//
+//     Variable Declarations
+//
+//------------------------------------------------------------------
+	var
+	static integer			attackrange; 			// When do I start shooting?
+																
+	static integer			piloting; 				// piloting skill
+	static integer			gunnery; 					// hit chance,
+	static real					mindelay;					// minimum amount of time I will wait between shots once a weapon is reloaded
+	static real					maxdelay;					// maximum amount of time I will wait between shots once a weapon is reloaded
+	static integer 			speed;			 			// What speed so I move at?
+	static integer 			elitelevel; 			// % elite chance, This helps determine tactics, defensive manuevers, opportunity fire
+																				// and other things that would normally be determined by combat experience
+
+ 	static integer			isshotradius;			// how far away from me will I detect an enemy shot.
+	static integer			movetype;					// how will it move down the path?
+
+	static Boolean 			attacksoundplayed;
+	static integer 			attacksound; 			// plays when it first attacks
+	static integer 			deathsound; 			// plays when it dies
+	
+	static integer			mood;							// What is my normal mood?
+	
+	static Boolean			Resumed;					// Have I gotten to the end of the path?
+	static Boolean			reachedendofpath;			// Have I gotten to the end of the path?
+																						// Note: This only gets set if movetype is set to move_nocycle.
+	static integer			path;						 			// what path am I following?
+	static Boolean 			attackersdistractit;	// if FALSE, it won't leave the path, even when things
+																						// are shooting it. It will shoot back. Defaults to true
+																						// Once unit reaches the end of the path, It attacks freely.
+	static Boolean 			Ambush;								// Hellspawn
+	static Boolean 			Elite;								// Left from other script
+	static Boolean 			Secret;								// Shutdown to start for ambush or to save CPU time
+	
+	static integer			teleportNav;					// All the elites will have this value set to a different Nav
+	
+	static ObjectID 		myVehicle;
+	static Locpoint 		myStart;							//	where I begin the game
+	static Boolean			MyTrigger;				// What Global Boolean Sets me off?
+//------------------------------------------------------------------
+//
+//     Local Functions
+//
+//------------------------------------------------------------------
+
+function init;
+	code
+	
+	Elite 								= FALSE;
+	Secret 								= FALSE;
+	Ambush 								= FALSE;
+	 				
+ 	switch (GetMemoryInteger(me,9))
+
+	case 12:															 //Hellspawn shutdown to backup tanks
+			
+		attackrange         = 800;
+		piloting            = 20;
+		gunnery             = 45;
+		mindelay            = 1.0;
+		maxdelay            = 1.5;
+		speed               = 70;
+		elitelevel          = 50;
+		IsShotRadius        = 80;
+		movetype 			= move_circle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 				= epa_Path_Ambush;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		myTrigger			=	AmbushTime;
+		Secret 				= TRUE;										 	
+		Ambush 				= TRUE;
+		
+	endcase;
+		
+	case 20:						 									// Investigate (HellSpawn to check out alerts)
+		
+		attackrange         = 800;
+		piloting            = 70;
+		gunnery             = 70;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 70;
+		IsShotRadius        = 80;
+		movetype 						= move_circle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Investigate;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		//MyTrigger						= NWAlarm;
+		
+	endcase;
+		
+	case 21:															 // Assault1			Thor
+	
+		attackrange         = 700;
+		piloting            = 70;
+		gunnery             = 70;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 55;
+		IsShotRadius        = 80;
+		movetype 						= move_seesaw;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Assault1;						 //
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		//MyTrigger						= SouthAlarm;
+		
+	endcase;
+ 	
+	case 22:															 // Assault2			Thor
+	
+		attackrange         = 700;
+		piloting            = 70;
+		gunnery             = 70;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 55;
+		IsShotRadius        = 80;
+		movetype 						= move_seesaw;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Assault2;						 //
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		//MyTrigger						= SouthAlarm;
+		
+	endcase;
+ 	
+	case 23:															 // Shadowcat
+	
+		attackrange         = 700;
+		piloting            = 70;
+		gunnery             = 70;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_seesaw;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Shadowcat;						 //
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		//MyTrigger						= SouthAlarm;
+		
+	endcase;
+ 	
+	case 81:															 // Shutdown1			Shadowcat
+	
+		attackrange         = 700;
+		piloting            = 70;
+		gunnery             = 70;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Shutdown1;						 //
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		MyTrigger						= ShutdownAlert;
+		Secret 							= TRUE;
+		
+	endcase;
+ 	
+	case 82:															 // Shutdown2			Madcat
+	
+		attackrange         = 700;
+		piloting            = 70;
+		gunnery             = 70;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Shutdown2;						 //
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		MyTrigger						= ShutdownAlert;
+		Secret 							= TRUE;
+		
+	endcase;
+ 	
+	case 83:															 // Shutdown3			Shadowcat
+	
+		attackrange         = 700;
+		piloting            = 70;
+		gunnery             = 70;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Shutdown1;						 //
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		MyTrigger						= ShutdownAlert;
+		Secret 							= TRUE;
+		
+	endcase;
+ 	
+	endswitch;
+ 	
+endfunction;
+
+//------------------------------------------------------------------
+//
+//     Main Code
+//				
+//								
+//------------------------------------------------------------------
+state startState;
+
+	code
+		SetFiringDelay					(me,mindelay,maxdelay);
+		setignorefriendlyfire		(me,true);
+		setisshotradius					(me,isshotradius);
+		setentropymood					(me,mood);
+		setcurmood							(me,mood);
+		setskilllevel						(me,piloting,gunnery,elitelevel);
+		//setsearchlight				(me,on);
+		//startexecute					(me);
+		//setalignment					(me,enemy);
+		
+		GetLocation(me,mystart);
+		
+		if (Secret == True) then
+			shutdown(me);
+			trans hangoutSECRET;
+		else
+			trans patrol;
+		endif;
+
+endstate;			
+
+state deadState;
+  code
+		
+		if (deathsound <> -1) then	
+			PlaySoundOnce(deathsound);
+		endif;		
+						
+		orderDie;
+endstate;
+
+state hangoutSECRET;
+  code
+		
+		If ((isShot (me)))	then
+			startup(me);
+			MyTrigger = true;
+			trans patrol;
+		endif;
+		
+		if ((iswithin(me,(groupobjectid(1)),200)) == true) then
+			startup(me);
+			MyTrigger = true;
+			trans patrol;
+		endif;
+		
+		If (MyTrigger == true) then						 //not working till I call this reassign this every few frames
+			startup(me);
+			orderMoveto(path,speed,movetype,true,true);
+  		setTarget(me,playermech);
+			trans patrol;
+		endif;
+						
+		If (ShutdownAlert == true) then
+			startup(me);
+			orderMoveto(path,speed,movetype,true,true);
+  		setTarget(me,playermech);
+			trans patrol;
+		endif;
+						
+		If (Ambush == true) then
+			If (AmbushTime == true) then
+				startup(me);
+				orderMoveto(path,speed,movetype,true,true);
+				setTarget(me,playermech);
+				trans patrol;
+			endif;
+		endif;
+						
+		If RetreatTime == TRUE then
+			ClearMoveOrder(me);
+				trans RetreatState;
+		endif; 			
+	
+endstate;
+	
+state hangoutELITE;
+  code
+		
+		If (MyTrigger == true) then
+			startup(me);
+			Teleport(me,myStart);
+			orderMoveto(path,speed,movetype,true,true);
+  		setTarget(me,playermech);
+			trans patrol;
+		endif;
+						
+endstate;
+	
+state RetreatState;
+  code
+		
+		speed = 600;
+		
+		attackrange         = 2000;
+		
+		if (setmytarget(attackrange)) then
+			trans attack;
+		else
+			If not iswithin(me,ena_Nav_Gamma,600) then
+				OrderMoveToObject((ena_Nav_Gamma),speed);
+			else
+				//Play the Voice Overs Here	
+				trans attack;
+			endif;
+	 	endif;
+		
+						
+endstate;
+	
+state BackupState;
+  code
+		
+		speed = 600;
+		
+		If not iswithin(me,ena_Nav_Gamma,600) then
+			OrderMoveToObject((ena_Nav_Gamma),speed);
+		else
+			//Play the Voice Overs Here	
+			trans attack;
+		endif;
+						
+endstate;
+	
+state MoveToAlarm;
+  code
+		
+		speed = 600;
+		
+		movetype 						= move_nocycle;
+			
+			If (AlphaAlarm == TRUE) then
+				If ((orderMoveto(epa_Path_AlphaAlert,speed,movetype,true,true)) == TRUE) then
+					ResetTimer(Look_timer);
+					AlphaAlarm = FALSE;
+					trans LookAround;
+				endif;
+			endif;
+
+			If (GammaAlarm == TRUE) then
+				If ((orderMoveto(epa_Path_GammaAlert,speed,movetype,true,true)) == TRUE) then
+					ResetTimer(Look_timer);
+					GammaAlarm = FALSE;
+					trans LookAround;
+				endif;
+			endif;
+
+			If (NWAlarm == TRUE) then
+				If ((orderMoveto(epa_Path_AlphaAlert,speed,movetype,true,true)) == TRUE) then
+					ResetTimer(Look_timer);
+					NWAlarm = FALSE;
+					trans LookAround;
+				endif;
+			endif;
+
+			If (NEAlarm == TRUE) then
+				If ((orderMoveto(epa_Path_AlphaAlert,speed,movetype,true,true)) == TRUE) then
+					ResetTimer(Look_timer);
+					NEAlarm = FALSE;
+					trans LookAround;
+				endif;
+			endif;
+
+			If (SouthAlarm == TRUE) then
+				If ((orderMoveto(epa_Path_GammaAlert,speed,movetype,true,true)) == TRUE) then
+					ResetTimer(Look_timer);
+					SouthAlarm = FALSE;
+					trans LookAround;
+				endif;
+			endif;
+						
+		If RetreatTime == TRUE then
+			ClearMoveOrder(me);
+				trans RetreatState;
+		endif; 			
+	
+		if (setmytarget(attackrange)) then
+			trans attack;
+	 	endif;
+						
+endstate;
+	
+state LookAround;
+  code
+		
+		speed = 80;
+		
+	if (timegreater(Look_timer,6)) then
+			//Play the Voice Overs Here	
+			trans ReturnToJob;
+		else
+			ordermovelookout;
+		endif;
+						
+endstate;
+	
+state ReturnToJob;
+  code
+		
+		speed = 80;
+		
+		clearmoveorder(me);
+		
+		movetype 						= move_seesaw;
+			
+			trans Patrol;
+						
+endstate;
+	
+	state patrol;
+
+  var
+    ObjectID foe;
+
+		code
+
+	//head down the path.  If this has already been done
+	// or if there is no path set then look around.
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+					if ((orderMoveto(path,speed,movetype,true,true)) == TRUE) then
+						reachedendofpath = TRUE;
+					endif; 			
+			else	 		 		
+				ordermovelookout;			
+			endif;
+			
+		//Find me a target
+		if (setmytarget(attackrange)) then
+			trans attack;
+	 	endif;
+		
+			If (AlphaAlarm == TRUE) or (GammaAlarm == TRUE) or (NWAlarm == TRUE) or (NEAlarm == TRUE) or (SouthAlarm == TRUE) then
+			ClearMoveOrder(me);
+				trans MoveToAlarm;
+			endif;
+			
+		If RetreatTime == TRUE then
+			ClearMoveOrder(me);
+				trans RetreatState;
+		endif; 			
+	
+	endstate;
+
+//------------------------------------------------------------------
+//
+//     attack state : description
+//
+//------------------------------------------------------------------
+	state attack;
+		
+		code
+		
+		speed = 600;						//Changed from 600 to 60 to keep 'em slow
+ 	
+		if (LeaveAttackState(attackrange*2)) then
+			orderstopattacking;
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,true);
+			else
+				trans patrol;
+			endif;
+		endif;
+		
+		//the ever popular attack order
+    orderAttack (attackersdistractit);
+		
+		//maybe swap targets when I am shot.
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 								
+	endstate;
+
+endfsm.
+//******************************************************************
+

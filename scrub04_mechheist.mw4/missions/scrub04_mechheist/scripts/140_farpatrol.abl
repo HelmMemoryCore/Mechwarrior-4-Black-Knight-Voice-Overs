@@ -1,0 +1,345 @@
+
+//------------------------------------------------------------------
+// NOTE: The fsm name below MUST be changed in order for the
+// script to be considered a unique entity!
+
+fsm farpatrol : integer;
+
+
+//------------------------------------------------------------------
+// Far Patrol:
+//   This script controls all enemy mechs before you get to the
+//   Mech base.
+//------------------------------------------------------------------
+
+
+
+//------------------------------------------------------------------
+//     Constants
+//------------------------------------------------------------------
+
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//     Types
+//------------------------------------------------------------------
+
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//     Variables
+//------------------------------------------------------------------
+
+	var
+		static integer			attackRange;		// At what range do I start shooting?
+		static integer			withdrawRange;		// At what range do I withdraw from combat completely?
+
+		static integer			piloting;			// Piloting skill
+		static integer			gunnery;			// Gunnery skill/chance to hit
+		static real				minDelay;			// Minimum amount of time I will wait between shots once a weapon is reloaded
+		static real				maxDelay;			// Maximum amount of time I will wait between shots once a weapon is reloaded
+		static integer 			eliteLevel;			// Elite level.  This helps determine tactics, defensive manuevers, opportunity fire
+													// and other things.  It indicates a general level of combat experience.
+		static integer			attackThrottle;		// My attack throttle
+		static integer			findTypes;			// What kind of enemies to look for
+        static integer			path;	            // What path to take.
+        static integer			speed;	            // Speed on the path.
+                
+ 		static integer			isShotRadius;		// How far away from me will I detect an enemy shot?
+
+		static integer 			attackSound;		// The attack sound I play when I first attack
+		static integer 			deathSound;			// The sound I play when I die
+		
+		static integer			mood;				// My default mood.
+
+		static integer			takeOffDistance;	// My take-off distance if I'm an airplane (ignored if not an airplane)
+        static boolean          timeroff;           // The shutdown timer is now counting.
+        static locpoint         mystart;            // This is the starting location used for teleport
+        static boolean          willflee;           // The Rebel Mech will flee after certain units have been destroyed
+
+//------------------------------------------------------------------
+//     Init: my initialization function
+//------------------------------------------------------------------
+
+function Init;
+	code
+		// script-specific variables
+		attackRange		= 900;
+		withdrawRange	= attackRange * 3 / 2;
+		takeOffDistance	= 150;
+
+		// driver settings
+		piloting		= 80;
+		gunnery			= 60;
+		minDelay		= 0.5;
+		maxDelay		= 1.0;
+		eliteLevel		= 60;
+		attackThrottle	= 80;
+		isShotRadius	= 120;
+		attackSound		= -1; // no sound
+		deathSound		= -1; // no sound
+		mood			= NEUTRAL_START;
+		findTypes		= FT_DEFAULT;
+        path            = -1;
+
+		if (GetMemoryInteger(me,9)==0) then         // Integer 0 = Ambush Mechs at Nav Alpha
+		    piloting		= 80;
+		    gunnery			= 80;
+	    	minDelay		= 0.1;
+    		maxDelay		= 0.4;
+            eliteLevel		= 90;
+		endif;
+		
+		if (GetMemoryInteger(me,9)==5) then         // Integer 5 = Rebel Mech at Nav Beta
+		    piloting		= 80;
+		    gunnery			= 150;
+	    	minDelay		= 0.0;
+    		maxDelay		= 0.3;
+            eliteLevel		= 90;
+            path            = epa_rebelflee;
+            speed           = 85;
+            willflee        = true;
+		endif;
+
+        if (GetMemoryInteger(me,9)==7) then         // Integer 8 = Mechs at Nav Beta (starts shutdown)
+		    piloting		= 5;
+		    gunnery			= 50;
+		endif;
+        
+        if (GetMemoryInteger(me,9)==8) then         // Integer 8 = Mechs at Nav Beta (starts shutdown)
+		    piloting		= 30;
+		    gunnery			= 50;
+		endif;
+
+endfunction;
+
+//------------------------------------------------------------------
+//	StartState: my initial state
+//------------------------------------------------------------------
+
+state StartState;
+
+	code
+		SetFiringDelay			(ME,minDelay,maxDelay);
+		SetIgnoreFriendlyFire	(ME,true);
+		SetIsShotRadius			(ME,isShotRadius);
+		SetEntropyMood			(ME,mood);
+		SetCurMood				(ME,mood);
+		SetSkillLevel			(ME,piloting,gunnery,eliteLevel);
+		SetAttackThrottle		(ME,attackThrottle);
+				
+		if (GetMemoryInteger(me,9)==0) then         // Integer 0 = Ambush Mechs at Nav Alpha
+			trans shutd;
+		endif;
+
+		if (GetMemoryInteger(me,9)==1) then         // Integer 1 = Light mech attack at the beginning
+            trans waiting1;
+		endif;
+
+		if (GetMemoryInteger(me,9)==5) then         // Integer 5 = Rebel Mech at Nav Beta
+			//Getlocation(me,mystart);
+            //teleporttohell(me);
+            shutdown(me);
+            trans teleporter;
+		endif;
+
+		if (GetMemoryInteger(me,9)==6) then         // Integer 6 = Light mech attack after Beta
+            Shutdown(me);
+            // Getlocation(me,mystart);
+            // teleporttohell(me);
+            trans teleporter3;
+		endif;
+
+		if (GetMemoryInteger(me,9)==7) then         // Integer 7 = Light mech attack after Alpha
+			Shutdown(me);
+            // Getlocation(me,mystart);
+            // teleporttohell(me);
+            trans teleporter2;
+		endif;
+        
+		if (GetMemoryInteger(me,9)==8) then         // Integer 8 = Mechs at Nav Beta (starts shutdown)
+			// Getlocation(me,mystart);
+            // teleporttohell(me);
+            shutdown(me);
+            trans teleporter;
+		endif;
+        
+        trans waitstate;                            // Integer 9 = Medium mech decoy near Nav Alpha
+
+
+endstate;
+
+//------------------------------------------------------------------
+//  The units stay shutdown until the players get near.
+//------------------------------------------------------------------
+
+state Shutd;
+	code
+		shutdown(me);
+        
+            if (IsWithin(playermech,ena_Nav_Alpha,200)) then
+                startup(me);
+                PlayVoiceOverOnce("VOX\OP2\MI4\Cold", TALKER_ERI);
+                trans waitstate;
+            endif;
+
+            if (ambushblown) then
+                startup(me);
+                trans waitstate;
+            endif;
+            
+            if (isshot(me)) then
+                ambushblown=true;
+                startup(me);
+                trans waitstate;
+            endif;
+        
+endstate;    
+
+//------------------------------------------------------------------
+//	Waiting1: The first Mechs should wait until the planes die
+//------------------------------------------------------------------
+
+state Waiting1;
+	code
+        
+        if (timegreater(9,10)) then
+			trans Gettoplayer;
+		endif;
+		
+endstate;
+
+//------------------------------------------------------------------
+//	Gettoplayer: Run Over to the Player
+//------------------------------------------------------------------
+
+state Gettoplayer;
+	code
+        		
+        if (FindEnemy(attackRange,findTypes)) then
+			trans AttackState;
+		endif;
+
+		ordermovetoobject(playermech,600);
+		
+endstate;
+
+//------------------------------------------------------------------
+//	Teleporter: Teleport off the map until the resources are cleared
+//------------------------------------------------------------------
+
+state teleporter;
+	code
+
+        if (iswithin(playermech,ena_nav_beta,1200)) then
+            // if (not iswithin(playermech,locpoint(mystart),1000)) then
+                startup(me);
+                trans waitstate;
+            // endif;     
+		endif;
+		
+endstate;
+
+//------------------------------------------------------------------
+//	Teleporter: Teleport off the map until the resources are cleared
+//------------------------------------------------------------------
+
+state teleporter2;
+	code
+
+        if (GroupNumDead(GroupObjectID(30))>0) then
+            if (not iswithin(playermech,ena_betapop1,1000)) then            
+                // teleport(me,mystart);
+                startup(me);
+                trans gettoplayer;
+		    endif;
+        endif;
+		
+endstate;
+
+//------------------------------------------------------------------
+//	Teleporter: Teleport off the map until the resources are cleared
+//------------------------------------------------------------------
+
+state teleporter3;
+	code
+
+        if (gammaport) then
+            // if (not iswithin(playermech,mystart,1000)) then
+                startup(me);
+                trans gettoplayer;
+		    // endif;
+        endif;
+		
+endstate;
+
+//------------------------------------------------------------------
+//	WaitState: wait for something to shoot
+//------------------------------------------------------------------
+
+state WaitState;
+	code
+        
+        if (path<>-1) then
+            OrderMoveTo(path,speed,move_nocycle,false,false);
+        endif;
+        
+        if (FindEnemy(attackRange,findTypes)) then
+			trans AttackState;
+		endif;		
+        
+endstate;
+
+//------------------------------------------------------------------
+//	AttackState: look for something to shoot
+//------------------------------------------------------------------
+
+state AttackState;
+	code
+
+        if (LeaveAttackState(withdrawRange)) then
+			OrderStopAttacking;
+			SetTarget(ME,NO_UNIT);
+			trans WaitState;
+		endif;
+
+		OrderAttack(true);
+        
+        if (willflee) then
+            if (GroupAllDead(GroupObjectID(32))) then
+                settargetdesirability(me,-1);
+                trans runaway;
+            endif;
+        endif;
+
+endstate;
+
+state Runaway;
+	code
+        
+        if (path<>-1) then
+            OrderMoveTo(path,speed,move_nocycle,false,false);
+        endif;
+        
+endstate;
+
+//------------------------------------------------------------------
+//	DeadState: OK, I kicked the bucket.
+//------------------------------------------------------------------
+
+state DeadState;
+	code
+		if (deathSound <> -1) then	
+			PlaySoundOnce(deathSound);
+		endif;		
+
+		orderDie;
+
+endstate;
+
+
+endfsm.
+

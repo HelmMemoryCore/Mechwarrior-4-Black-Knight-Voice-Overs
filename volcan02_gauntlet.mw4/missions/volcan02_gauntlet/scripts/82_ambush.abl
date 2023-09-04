@@ -1,0 +1,325 @@
+
+//------------------------------------------------------------------
+// NOTE: The fsm name below MUST be changed in order for the
+// script to be considered a unique entity!
+//------------------------------------------------------------------
+
+fsm ambush : integer;
+
+
+//------------------------------------------------------------------
+// Ambush:
+//   Controls ambush Mech behavior.
+//------------------------------------------------------------------
+
+
+
+//------------------------------------------------------------------
+//     Constants
+//------------------------------------------------------------------
+
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//     Types
+//------------------------------------------------------------------
+
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//     Variables
+//------------------------------------------------------------------
+
+	var
+    
+    // Standard Mech and Vehicle variables
+        static integer			attackRange;		// At what range do I start shooting?
+		static integer			withdrawRange;		// At what range do I withdraw from combat completely?
+                                                    //
+		static integer			piloting;			// Piloting skill
+		static integer			gunnery;			// Gunnery skill/chance to hit
+		static real				minDelay;			// Minimum amount of time I will wait between shots once a weapon is reloaded
+		static real				maxDelay;			// Maximum amount of time I will wait between shots once a weapon is reloaded
+		static integer 			eliteLevel;			// Elite level.  This helps determine tactics, defensive manuevers, opportunity fire
+													// and other things.  It indicates a general level of combat experience.
+		static integer			attackThrottle;		// My attack throttle
+		static integer			findTypes;			// What kind of enemies to look for
+        static integer			path;	            // What path to take.
+        static integer			speed;	            // Speed on the path.
+                                                    //
+ 		static integer			isShotRadius;		// How far away from me will I detect an enemy shot?
+                                                    //
+		static integer 			attackSound;		// The attack sound I play when I first attack
+		static integer 			deathSound;			// The sound I play when I die
+		                                            //
+		static integer			mood;				// My default 
+		static integer			takeOffDistance;	// My take-off distance if I'm an airplane (ignored if not an airplane)
+    //
+		
+        static integer			groupNumber;		// What's my group -- i.e. I will use GroupObjectID(groupNumber) to identify my group
+		static integer			formationType;		// What kind of formation am I in?
+		static integer			formationDensity;	// How densely are we packed?
+		static integer			moveType;			// How I move along the path
+        static integer          ambushpoint;        // Where the units wait for the players
+        static locpoint         mynav;              // My nav point
+        
+//------------------------------------------------------------------
+//     Init: my initialization function
+//------------------------------------------------------------------
+
+function Init;
+	code
+		// script-specific variables
+		attackRange		= 700;
+		withdrawRange	= attackRange * 3 / 2;
+		groupNumber		= -1;
+		path			= -1;
+		moveType		= move_nocycle;
+		speed			= 70;
+		formationType	= 1;
+		formationDensity= formtype_sparse;
+		takeOffDistance	= 150;
+
+		// driver settings
+		piloting		= 90;
+		gunnery			= 110;
+		minDelay		= 0.5;
+		maxDelay		= 1.2;
+		eliteLevel		= 60;
+		attackThrottle	= 90;
+		isShotRadius	= 120;
+		attackSound		= -1; // no sound
+		deathSound		= -1; // no sound
+		mood			= NEUTRAL_START;
+		findTypes		= FT_DEFAULT;
+
+        switch (GetMemoryInteger(me,9))
+        
+            case 0:                 // First ambush Mechs
+                ambushpoint = ena_navambush1_1;
+                GroupNumber = 20;
+            endcase;
+            
+            case 1:                 // Overt Mechs at first Ambush
+                attackRange	= 700;
+                ambushpoint = 0;        // Go straight to path
+                path        = epa_ambushpath_1;
+            endcase;
+
+            case 2:                 // Nav Beta Mechs
+                attackRange	= 1000;
+                path = epa_betaintercept;
+                ambushpoint = 1;        // Wait for BetaAttack
+            endcase;
+
+            case 3:                 // After Alpha death these come
+                attackRange	= 1000;
+                ambushpoint = 2;        // Go straight to player
+            endcase;
+
+            case 4:
+                ambushpoint = 3;
+            endcase;
+            
+            case 5:
+                ambushpoint = 4;
+                path        = epa_ambushpath_2;
+            endcase;
+            
+            case 6:
+                ambushpoint = -1;
+            endcase;
+            
+            case 7:
+                ambushpoint = 0;
+            endcase;
+        
+        endswitch;
+        
+
+endfunction;
+
+//------------------------------------------------------------------
+//	StartState: my initial state
+//------------------------------------------------------------------
+
+state StartState;
+
+	code
+		SetFiringDelay			(ME,minDelay,maxDelay);
+		SetIgnoreFriendlyFire	(ME,true);
+		SetIsShotRadius			(ME,isShotRadius);
+		SetEntropyMood			(ME,mood);
+		SetCurMood				(ME,mood);
+		SetSkillLevel			(ME,piloting,gunnery,eliteLevel);
+		SetAttackThrottle		(ME,attackThrottle);
+
+        if (startgame) then
+            trans start2;
+        endif;
+
+endstate;
+
+state Start2;
+    code
+    
+        if (ambushpoint == -1) then
+            trans GotoPlayer;
+        endif;
+
+        if (ambushpoint == 0) then
+            trans FollowPathState;
+        endif;
+
+        Shutdown(me);
+
+        if (ambushpoint == 1) then
+            GetLocation(me,mynav);
+            teleporttohell(me);
+            trans Waiting;
+        endif;
+
+        if (ambushpoint == 2) then
+            GetLocation(me,mynav);
+            teleporttohell(me);
+            trans Waiting;
+        endif;
+
+        if (ambushpoint == 3) then
+            GetLocation(me,mynav);
+            teleporttohell(me);
+            trans Waiting;
+        endif;
+        
+        if (ambushpoint == 4) then
+            GetLocation(me,mynav);
+            teleporttohell(me);
+            trans Waiting;
+        endif;
+
+        if (alphaattack) then
+            Startup(me);
+		    trans FollowPathState;
+        endif;
+
+endstate;
+
+state Waiting;
+    code
+
+        if (ambushpoint == 1) then
+            if (betaattack) then
+                teleport(me,mynav);
+                startup(me);
+                trans FollowPathState;
+            endif;
+        endif;
+        
+        if (ambushpoint == 2) then
+            if (GroupAllDead(GroupObjectID(20))) then
+                teleport(me,mynav);
+                startup(me);
+                trans GotoPlayer;
+            endif;
+        endif;
+
+        if (ambushpoint == 3) then
+            if (GammaAttack) then
+                teleport(me,mynav);
+                startup(me);
+                trans GoToPlayer;
+            endif;
+        endif;
+        
+        if (ambushpoint == 4) then
+            if (GammaAttack) then
+                teleport(me,mynav);
+                startup(me);
+                trans FollowPathState;
+            endif;
+        endif;
+        
+    
+endstate;
+
+//------------------------------------------------------------------
+//	FollowPathState: follow our path, but keep an eye out for enemies
+//------------------------------------------------------------------
+
+state FollowPathState;
+	code
+		if (FindEnemy(attackRange,findTypes)) then
+			trans AttackState;
+		endif;
+
+		if (path <> -1) then
+		//	if (timegreater(gti_timer_20,3)) then
+                OrderMoveTo(path,speed,move_nocycle,false,false);
+                // OrderFormationMove((groupobjectid(groupNumber)),path,speed,moveType,formationType,formationDensity,false);
+        //    endif;
+		
+        else
+		    OrderMoveLookOut;
+        endif;
+        
+endstate;
+
+//------------------------------------------------------------------
+//	Gotoplayer: Run Over to the Player
+//------------------------------------------------------------------
+
+state Gotoplayer;
+	code
+        		
+        if (FindEnemy(attackRange,findTypes)) then
+			trans AttackState;
+		endif;
+
+		ordermovetoobject(playermech,600);
+		
+endstate;
+
+//------------------------------------------------------------------
+//	AttackState: attack my target
+//------------------------------------------------------------------
+
+state AttackState;
+	code
+		if (LeaveAttackState(withdrawRange)) then
+			OrderStopAttacking;
+			SetTarget(ME,NO_UNIT);
+			trans FollowPathState;
+		endif;
+
+		if (attackSound <> -1) then	
+			PlaySoundOnce(attackSound);
+		endif;
+
+		OrderAttack(true);
+        
+        If (IsDead(me)) then
+            Trans DeadState;
+        endif;
+
+endstate;
+
+//------------------------------------------------------------------
+//	DeadState: OK, I kicked the bucket.
+//------------------------------------------------------------------
+
+state DeadState;
+	code
+		if (deathSound <> -1) then	
+			PlaySoundOnce(deathSound);
+		endif;		
+
+		OrderDie;
+
+endstate;
+
+
+endfsm.
+

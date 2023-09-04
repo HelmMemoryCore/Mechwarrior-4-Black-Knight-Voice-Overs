@@ -1,0 +1,979 @@
+
+//*********************************************************************************
+
+fsm scrub04_mechheist : integer;		
+
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+     const
+
+		#include_ <content\ABLScripts\mwconst.abi>
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+     type
+
+		#include_ <content\ABLScripts\mwtype.abi>
+
+//------------------------------------------------------------------
+//
+//     Variable Declarations
+//
+//------------------------------------------------------------------
+      var
+			
+		eternal integer     playermech;
+        eternal boolean     betaport;           // Teleport in Mechs from Nav Beta
+        eternal boolean     gammaport;          // Teleport in Mechs from Nav Gamma
+        eternal boolean     rebelport;          // Teleport in Rebel and Dressari Mechs
+        eternal boolean     waveport;           // Teleport in wave to attack mech base
+        		
+        static boolean	    alphareached;       // Nav Alpha reached
+        static boolean	    betareached;        // Nav Alpha reached
+        static boolean	    gammareached;       // Nav Alpha reached
+		
+        static boolean	    betarevealed;       // Nav Beta is shown
+        static boolean	    gammarevealed;      // Nav Gamma is shown
+        
+		static integer	    cinema_cut;
+        static integer      checkrange;         // This is how far from the Nav you have to be
+        
+        static boolean      obj1a;              // This indicates whether Obj 1a was completed
+        static boolean      obj1;               // This indicates whether Obj 1 was completed
+        eternal boolean     obj2;               // This indicates whether Obj 2 was completed
+        static boolean      obj2a;              // This indicates whether Obj 2a was completed
+        static boolean      obj3;               // This indicates whether Obj 3 was completed
+        static boolean      obj4;               // This indicates whether Obj 4 was completed
+        
+        // static boolean  obj1revealed;       // This indicates that Obj 1 has been revealed
+        static boolean      obj2revealed;       // This indicates that Obj 1 has been revealed
+        static boolean      obj3revealed;       // This indicates that Obj 1 has been revealed
+        static boolean      obj4revealed;       // This indicates that Obj 1 has been revealed
+        static boolean      op2_airbase;        // Did the player complete Scrub03 before getting here
+        static integer      wimpy;              // For the easy setting
+        static locpoint     TempPoint;          // Used to teleport in units for the movie
+        eternal boolean     ambushblown;        // The ambush was blown at NavAlpha
+        static boolean      deltagone;          // The player has decided to help out the rebels
+        static boolean      ending;             // Triggered a mission success if TRUE
+        static boolean      rebelsdied;         // You tried to help the rebels out but they all died go boom
+		
+//------------------------------------------------------------------
+//
+//     Init Function    (automatically run first time through)
+//
+//------------------------------------------------------------------
+
+function init;
+	var
+		integer i;
+
+	code
+
+		 playermech = getplayervehicle(epl_player0);	
+ 	
+			GroupAddObject(GroupObjectId(1),playermech);
+            
+            GroupAddObject(GroupObjectId(2),eve_techconvoy_1);
+            GroupAddObject(GroupObjectId(2),eve_techconvoy_2);
+            SetGroupAI(groupobjectid(2),GROUPAI_MOODSQUAD);
+            
+            GroupAddObject(GroupObjectID(3),eve_Rebel_1);
+            GroupAddObject(GroupObjectID(3),eve_Rebel_2);
+            GroupAddObject(GroupObjectID(3),eve_Rebel_3);
+            GroupAddObject(GroupObjectID(3),eve_Rebel_4);
+            SetGroupAI(groupobjectid(2),GROUPAI_MOODSQUAD);
+            
+            GroupAddObject(GroupObjectId(20),eve_mbguard_1);
+            GroupAddObject(GroupObjectId(20),eve_mbguard_2);
+            GroupAddObject(GroupObjectId(20),eve_mbguard_3);
+            GroupAddObject(GroupObjectId(20),eve_mbguard_4);
+            GroupAddObject(GroupObjectId(20),eve_mbguard_5);
+            GroupAddObject(GroupObjectId(20),eve_mbguard_6);
+            GroupAddObject(GroupObjectId(20),eve_farpatrol_g1);
+            SetGroupAI(groupobjectid(20),GROUPAI_MOODSQUAD);
+            
+            // The Base Turrets
+            GroupAddObject(GroupObjectId(21),etu_baseturret_01);
+            GroupAddObject(GroupObjectId(21),etu_baseturret_02);
+            GroupAddObject(GroupObjectId(21),etu_baseturret_03);
+            GroupAddObject(GroupObjectId(21),etu_baseturret_04);
+            GroupAddObject(GroupObjectId(21),etu_baseturret_05);
+            GroupAddObject(GroupObjectId(21),etu_baseturret_06);
+            SetGroupAI(groupobjectid(21),GROUPAI_MOODSQUAD);
+            
+            // Mechs in Ambush at Alpha
+            GroupAddObject(GroupObjectId(30),eve_farpatrol_a1);
+            GroupAddObject(GroupObjectId(30),eve_farpatrol_a2);
+            SetGroupAI(groupobjectid(30),GROUPAI_MOODSQUAD);
+
+            // Enemy Mechs at the beginning
+            GroupAddObject(GroupObjectId(31),eve_farpatrol_ax1);
+            GroupAddObject(GroupObjectId(31),eve_farpatrol_ax2);
+            //GroupAddObject(GroupObjectId(31),eve_farpatrol_ax3);
+            SetGroupAI(groupobjectid(31),GROUPAI_MOODSQUAD);
+            
+            // Enemy Mechs at Nav Beta
+            GroupAddObject(GroupObjectId(32),eve_farpatrol_b1);
+            GroupAddObject(GroupObjectId(32),eve_farpatrol_b2);
+            GroupAddObject(GroupObjectId(32),eve_farpatrol_b3);
+            SetGroupAI(groupobjectid(32),GROUPAI_MOODSQUAD);
+            GetLocation(ena_nav_beta,TempPoint);
+            SetCombatLeash(GroupObjectID(32),TempPoint,1000);
+            
+            // Enemy Mechs after Alpha found (timer at Nav Alpha)
+            GroupAddObject(GroupObjectId(33),eve_farpatrol_bx1);
+            //GroupAddObject(GroupObjectId(33),eve_farpatrol_bx2);
+            SetGroupAI(groupobjectid(33),GROUPAI_MOODSQUAD);
+            
+            GroupAddObject(GroupObjectId(34),eve_wave_1);
+            GroupAddObject(GroupObjectId(34),eve_wave_2);
+            GroupAddObject(GroupObjectId(34),eve_wave_3);
+            GroupAddObject(GroupObjectId(34),eve_wave_4);
+            GroupAddObject(GroupObjectId(34),eve_wave_5);
+            GroupAddObject(GroupObjectId(34),eve_wave_6);
+            GroupAddObject(GroupObjectId(34),eve_wave_7);
+             SetGroupAI(groupobjectid(34),GROUPAI_MOODSQUAD);
+            
+            // Enemy attack after Beta cleared
+            GroupAddObject(GroupObjectId(35),eve_farpatrol_gx1);
+            GroupAddObject(GroupObjectId(35),eve_farpatrol_gx2);
+            GroupAddObject(GroupObjectId(35),eve_farpatrol_gx3);
+            SetGroupAI(groupobjectid(35),GROUPAI_MOODSQUAD);
+            
+            GroupAddObject(GroupObjectId(40),eve_dressari_1);
+            GroupAddObject(GroupObjectId(40),eve_dressari_2);
+            GroupAddObject(GroupObjectId(40),eve_dressari_3);
+            GroupAddObject(GroupObjectId(40),eve_dressari_4);
+            SetGroupAI(groupobjectid(40),GROUPAI_MOODSQUAD);
+            
+            GroupAddObject(GroupObjectId(50),eve_aircraft_01);
+            GroupAddObject(GroupObjectId(50),eve_aircraft_02);
+            SetGroupAI(groupobjectid(50),GROUPAI_MOODSQUAD);           
+
+            // This is the group that gets shutdown during the opening cineractivity
+            GroupAddObject(GroupObjectId(51),eve_aircraft_01);
+            GroupAddObject(GroupObjectId(51),eve_aircraft_02);
+            GroupAddObject(GroupObjectId(51),eve_farpatrol_ax1);
+            GroupAddObject(GroupObjectId(51),eve_farpatrol_ax2);
+            //GroupAddObject(GroupObjectId(51),eve_farpatrol_ax3);
+
+            // This is the group that gets shutdown during the opening cineractivity
+            GroupAddObject(GroupObjectId(52),eve_aircraft_10);
+            GroupAddObject(GroupObjectId(52),eve_aircraft_11);
+            GroupAddObject(GroupObjectId(52),eve_aircraft_12);
+            GroupAddObject(GroupObjectId(52),eve_aircraft_20);
+            GroupAddObject(GroupObjectId(52),eve_aircraft_21);
+            GroupAddObject(GroupObjectId(52),eve_aircraft_30);
+            GroupAddObject(GroupObjectId(52),eve_aircraft_31);
+            
+ 		
+		cinema_cut = 0; 						
+		
+endfunction;
+
+//------------------------------------------------------------------
+//
+//     Main Code
+//
+//------------------------------------------------------------------
+state startState;
+
+	code	
+            checkrange = 200;
+            
+            alphareached =  false;
+            betareached =   false;
+            gammareached =  false;
+            betarevealed =  false;
+            gammarevealed = false;
+            betaport =      false;
+            
+            obj1 =          false;
+            obj2 =          false;
+            obj2a =         false;
+            obj3 =          false;
+            obj4 =          false;
+            // obj1revealed =  false;
+            obj2revealed =  false;
+            obj3revealed =  false;
+            obj4revealed =  false;
+            
+            setradarnav(ena_Nav_Alpha,1);
+            setradarnav(ena_Nav_Beta,2);
+            setradarnav(ena_Nav_Gamma,3);
+            setradarnav(ena_Nav_Delta,4);
+            
+            revealnavpoint(ena_Nav_Alpha);
+            setnavpoint(ena_Nav_Alpha);
+            
+            
+            if GetEventFlag("SKIES_CLEARED") then
+                Shutdown(GroupObjectID(52));
+                TeleporttoHell(GroupObjectID(52));
+                Destroy(GroupObjectID(52));
+            endif;
+
+            StartMusic("Music\Daggers",3.5,3.0,40);
+
+            Wimpy = GetDifficulty;
+    
+            // In easy mode take out the two powered down base 'Mechs
+            If (wimpy == EASY_DIFFICULTY) then
+                Shutdown(eve_mbguard_1);
+                TeleporttoHell(eve_mbguard_1);
+                Destroy(eve_mbguard_1);
+                GroupRemoveObject(GroupObjectId(20),eve_mbguard_2);
+                //Destroy(eve_farpatrol_ax3);
+            endif;
+        
+			trans opening;
+			//trans won;
+
+endstate;
+
+	
+state deadState;
+	code
+endstate;
+	
+//------------------------------------------------------------------
+//
+//     Sit state : description
+//
+//------------------------------------------------------------------
+state sit;
+
+	code
+
+	if IsMusicPlaying == false then
+		StartMusic("Music\ArcticAmbLoop",2.0,2.0,20);
+	endif;
+    
+// Audio Triggers
+
+    if (not GetGlobalTrigger(1)) then
+        if (timegreater(17,6)) then
+            PlayLancemateSound("VOX\OP2\MI4\Approach",1);
+            SetGlobalTrigger(1,true);
+        endif;
+    endif;
+
+    if (GetGlobalTrigger(5)) then
+        if (not GetGlobalTrigger(6)) then
+            if (iswithin(playermech,ena_nav_beta,700)) then     // Later I should check to see if there are three guys left here
+                PlayLancemateSound("VOX\OP2\MI4\Sport",1);
+                SetGlobalTrigger(6,true);
+            endif;
+        endif;
+    endif;
+
+// Triggers & Teleport in new mechs from hell & convoy
+
+    if (not betaport) then
+        // if (not iswithin(playermech,ena_Nav_Beta,1000)) then
+            if (groupalldead(GroupObjectID(30))) then
+                if (groupalldead(GroupObjectID(31))) then
+                    betaport = true;    // Now the Mechs at Nav Beta port in
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Rebels", TALKER_MAN);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Rebels", TALKER_ERI);
+                    SetGlobalTrigger(5,true);
+                    //PlayVoiceOverOnce("VOX\OP2\MI4\Sport", TALKER_RAD);
+                endif;
+            endif;
+        // endif;
+    endif;
+    
+    if (betaport) then
+        if (not gammaport) then
+            if (groupalldead(GroupObjectID(32))) then
+                if (groupalldead(GroupObjectID(33))) then
+                    gammaport = true;    // Now the Mechs at Nav Gamma port in
+                endif;
+            endif;
+        endif;
+    endif;
+    
+    //if (obj3revealed) then
+        if (not waveport) then
+            if (GroupNumDead(GroupObjectID(20))>3) then
+                waveport=true;
+                PlayVoiceOverOnce("VOX\OP2\MI4\Light", TALKER_MAN);
+                PlayVoiceOverOnce("VOX\OP2\MI4\Light", TALKER_ERI);
+            endif;
+        endif;
+    //endif;
+
+    if (not obj1a) then     // If the player takes too long to get to Alpha, power up ambush Mechs
+        if (not GetGlobalTrigger(10)) then
+            if (iswithin(playermech,ena_nav_alpha,930)) then
+                SetGlobalTrigger(10,true);
+                PlayVoiceOverOnce("VOX\OP2\MI4\Chaotic", TALKER_MAN);
+                StartTimer(10);
+            endif;
+        endif;
+    endif;
+
+    if (not ambushblown) then
+        if (timegreater(10,50)) then
+            ambushblown=true;
+        endif;
+    endif;
+
+// Reveal Nav Points
+
+    if (not betarevealed) then
+        if (iswithin(playermech,ena_Nav_Alpha,checkrange)) then
+            revealnavpoint(ena_Nav_Beta);
+            setnavpoint(ena_Nav_Beta);
+            betarevealed=true;
+        endif;
+    endif;
+
+    if (not gammarevealed) then
+        if (iswithin(playermech,ena_Nav_Beta,checkrange)) then
+            revealnavpoint(ena_Nav_Gamma);
+            setnavpoint(ena_Nav_Gamma);
+            gammarevealed=true;
+        endif;
+    endif;
+
+	
+// Nav Point Betty
+
+if (not alphareached) then
+	if (isnavrevealed(ena_nav_alpha)) then
+		if (iswithin(playermech,ena_nav_alpha,checkrange)) then
+			playvoiceover("VO\generic\navalpha",talker_Bet);
+			alphareached = true;
+		endif;
+	endif;
+endif;
+
+if (not betareached) then
+	if (isnavrevealed(ena_nav_beta)) then
+		if (iswithin(playermech,ena_nav_beta,checkrange)) then
+			playvoiceover("VO\generic\navbeta",talker_Bet);
+			betareached = true;
+		endif;
+	endif;
+endif;
+
+if (not gammareached) then
+	if (isnavrevealed(ena_nav_gamma)) then
+		if (iswithin(playermech,ena_nav_gamma,checkrange)) then
+			playvoiceover("VO\generic\navgamma",talker_Bet);
+			gammareached = true;
+		endif;
+	endif;
+endif;
+
+			
+// Reveal the objectives
+
+// Previous Objective 1 - Get to the Mech Base at Nav Gamma
+
+    if (not obj1) then
+        if (iswithin(playermech,ena_Nav_Gamma,800)) then
+            obj1=true;
+            gammaport=true; // In case the player went straight for the base
+            starttimer(15);
+        endif;
+    endif;
+
+// Objective 1a - Destroy the communications dish
+
+    if (not obj1a) then
+        if (isdead(ebu_communications_array)) then
+            successobjective(eob_objective1a);
+            revealnavpoint(ena_Nav_Beta);
+            setnavpoint(ena_Nav_Beta);
+            ambushblown = true;     // If you destroy the Comm Tower make the 'Mechs come on line
+            betarevealed=true;
+            obj1a=true;
+        endif;
+    endif;
+
+// Objective 2 - Destroy the Turret Control Tower
+
+    if (not obj2revealed) then  // Now revealed at the beginning of the mission
+                                // this is left here for the VO trigger.
+        if (iswithin(playermech,ena_Nav_Gamma,1200)) then
+            revealobjective(eob_objective2);
+            //revealobjective(eob_objective2a);
+            obj2revealed=true;
+            PlayVoiceOverOnce("VOX\OP2\MI4\Screen", TALKER_ERI);
+            PlayVoiceOverOnce("VOX\OP2\MI4\Screen", TALKER_MAN);
+            PlayVoiceOverOnce("VOX\OP2\MI4\Screen", TALKER_TEC);
+            PlayVoiceOverOnce("VOX\OP2\MI4\Screen2", TALKER_ERI);
+            PlayVoiceOverOnce("VOX\OP2\MI4\Screen2", TALKER_TEC);
+            PlayVoiceOverOnce("VOX\OP2\MI4\Repair", TALKER_MAN);
+        endif;
+    endif;
+    
+    if (not obj2) then
+        if (isdead(ebu_Turret_Control_Tower)) then
+            successobjective(eob_objective2);
+            obj2=true;
+        endif;
+    endif;
+    
+    if (not obj2) then
+        if (GroupAllDead(GroupObjectID(21))) then
+            failobjective(eob_objective2);
+            obj2=true;
+        endif;
+    endif;
+
+// Objective 2a - Destroy the Mech Base defenders
+    
+    if (not obj2a) then
+        if (groupalldead(GroupObjectID(20))) then
+            if (obj2) then
+                successobjective(eob_objective2a);
+                obj2a=true;
+                PlayVoiceOverOnce("VOX\OP2\MI4\Clear", TALKER_ERI);
+                PlayVoiceOverOnce("VOX\OP2\MI4\Clear", TALKER_TEC);
+            else
+                if (GroupAllDead(GroupObjectID(21))) then
+                    successobjective(eob_objective2a);
+                    obj2a=true;
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Clear", TALKER_ERI);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Clear", TALKER_TEC);
+                endif;
+            endif;
+        endif;
+    endif;
+       
+// Objective 3 - Defend the Techs
+//   VICTORY if enough time passes and you don't help the rebels
+
+    if (not obj3revealed) then
+        if (groupalldead(GroupObjectID(20))) then
+            if (obj2) then
+                revealobjective(eob_objective3);
+                obj3revealed=true;
+                // PlayVoiceOverOnce("VOX\OP2\MI4\HotWire", TALKER_TEC);
+                starttimer(gti_timer_20);
+            endif;
+        endif;
+    endif;
+    
+    if (obj4revealed) then
+        if (not Ending) then        
+            if (not deltagone) then
+                if (timegreater(gti_timer_1,80)) then
+                    if (iswithin(playermech,ena_Nav_Gamma,500)) then
+                        failobjective(eob_objective4);
+                        successobjective(eob_objective3);
+                        PlayVoiceOverOnce("VOX\OP2\MI4\Refit", TALKER_MAN);
+                        PlayVoiceOverOnce("VOX\OP2\MI4\Refit", TALKER_BAD);
+                        PlayVoiceOverOnce("VOX\OP2\MI4\Refit", TALKER_ERI);
+                        if (not obj1a) then
+                            failobjective(eob_objective1a);
+                        endif;
+                        ending = true;
+                        starttimer(3);                    
+                    endif;
+                endif;
+            endif;
+        endif;
+    endif;
+
+    if (not deltagone) then
+        if (obj4revealed) then
+            if (timegreater(gti_timer_1,20)) then
+                if (not iswithin(playermech,ena_Nav_Gamma,800)) then
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Delta", TALKER_ERI);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Delta", TALKER_TEC);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Delta2", TALKER_ERI);
+                    deltagone=true;
+                endif;
+            endif;
+        endif;
+    endif;
+
+        
+// Objective 4 - Help the Rebels
+//   VICTORY if you succeed
+
+    if (not obj4revealed) then
+        if (timegreater(gti_timer_20,115)) then
+            revealobjective(eob_objective4);
+            PlayVoiceOverOnce("VOX\OP2\MI4\Timber", TALKER_REB);
+            PlayVoiceOverOnce("VOX\OP2\MI4\Timber", TALKER_MAN);
+            if (Random(1)==1) then
+                If (PlayLancemateSound("VOX\OP2\MI4\Timbera",1)) then
+                    PlayLancemateSound("VOX\OP2\MI4\Timbera2",1);
+                else
+                    If (PlayLancemateSound("VOX\OP2\MI4\Timberb",1)) then
+                        PlayLancemateSound("VOX\OP2\MI4\Timberb2",1);
+                    endif;
+                endif;
+            else
+                If (PlayLancemateSound("VOX\OP2\MI4\Timberb",1)) then
+                    PlayLancemateSound("VOX\OP2\MI4\Timberb2",1);
+                else
+                    If (PlayLancemateSound("VOX\OP2\MI4\Timbera",1)) then
+                        PlayLancemateSound("VOX\OP2\MI4\Timbera2",1);
+                    endif;
+                endif;
+            endif;
+            obj4revealed=true;
+            rebelport=true;
+            revealnavpoint(ena_Nav_Delta);
+            setnavpoint(ena_Nav_Delta);
+            killtimer(gti_timer_20);
+            starttimer(gti_timer_1);   // Countdown to go help the rebels
+            resettimer(1);
+        endif;
+    endif;
+    
+    if (not obj4revealed) then
+        if (timegreater(15,420)) then
+            revealobjective(eob_objective4);
+            PlayVoiceOverOnce("VOX\OP2\MI4\Timber", TALKER_REB);
+            PlayVoiceOverOnce("VOX\OP2\MI4\Timber", TALKER_MAN);
+            if (Random(1)==1) then
+                If (PlayLancemateSound("VOX\OP2\MI4\Timbera",1)) then
+                    PlayLancemateSound("VOX\OP2\MI4\Timbera2",1);
+                else
+                    If (PlayLancemateSound("VOX\OP2\MI4\Timberb",1)) then
+                        PlayLancemateSound("VOX\OP2\MI4\Timberb2",1);
+                    endif;
+                endif;
+            else
+                If (PlayLancemateSound("VOX\OP2\MI4\Timberb",1)) then
+                    PlayLancemateSound("VOX\OP2\MI4\Timberb2",1);
+                else
+                    If (PlayLancemateSound("VOX\OP2\MI4\Timbera",1)) then
+                        PlayLancemateSound("VOX\OP2\MI4\Timbera2",1);
+                    endif;
+                endif;
+            endif;
+            obj4revealed=true;
+            rebelport=true;
+            revealnavpoint(ena_Nav_Delta);
+            setnavpoint(ena_Nav_Delta);
+            killtimer(gti_timer_20);
+            starttimer(gti_timer_1);   // Countdown to go help the rebels
+            resettimer(1);
+        endif;
+    endif;
+
+    if (obj4revealed) then
+        if (groupalldead(GroupObjectID(3))) then
+            failobjective(eob_objective4);
+            obj4=true;
+        endif;
+    endif;
+
+    if (obj4) then   // If the rebels are all destroyed, this is triggered
+        if (not Ending) then
+            if (obj1a) then
+                if (groupalldead(GroupObjectID(3))) then
+                    Ending = true;
+                    StartTimer(3);
+                    
+                    // davelueh add audio here...
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Refit", TALKER_MAN);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Refit", TALKER_BAD);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Refit", TALKER_ERI);
+    
+                    RebelsDied = true;
+      
+                    if (not obj1a) then
+                        failobjective(eob_objective1a);
+                    endif;
+                endif;
+            endif;
+        endif;
+    endif;
+
+    if (not obj4) then
+        if (groupalldead(GroupObjectID(40))) then
+            if (not groupalldead(GroupObjectID(3))) then
+                successobjective(eob_objective4);
+                obj4=true;
+                successobjective(eob_objective3);
+        		KillVoiceOvers;
+                if (GetEventFlag("SQUIRE_FRIEND")) then
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Scope", TALKER_MAN);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Thanks", TALKER_REB);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Thanks", TALKER_ERI);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Thanks3", TALKER_REB);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Eagle", TALKER_REB);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Eagle", TALKER_ERI);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Eagle2", TALKER_REB);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Trust", TALKER_MAN);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Trust2", TALKER_ERI);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Return", TALKER_ERI);
+                else
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Scope", TALKER_MAN);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Thanks2", TALKER_REB);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Thanks", TALKER_ERI);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Thanks3", TALKER_REB);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Eagle", TALKER_REB);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Eagle", TALKER_ERI);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Eagle2", TALKER_REB);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Trust", TALKER_MAN);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Trust", TALKER_ERI);
+                    PlayVoiceOverOnce("VOX\OP2\MI4\Return", TALKER_ERI);
+                endif;
+                if (not obj1a) then
+                    failobjective(eob_objective1a);
+                endif;
+                
+                SetEventFlag("REBEL_FRIEND",TRUE);
+                
+                starttimer(3);
+            endif;    
+        endif;
+    endif;
+    
+    if (timegreater(3,5)) then
+      
+      // Salvage Added by Ferret 7/28/01         
+        AddWeaponSalvage("ERMediumLaser",4);
+        AddWeaponSalvage("PPC",1);            
+        AddWeaponSalvage("Gauss",1);
+        AddWeaponSalvage("LightGauss",1);
+        AddWeaponSalvage("SSRM6",1);
+        AddWeaponSalvage("ClanLRM20",1);
+        AddWeaponSalvage("UltraAC20",1);
+		AddWeaponSalvage("ClanUltraAC20",1);
+
+        AddMechInstanceSalvage("Loki");
+        AddMechInstanceSalvage("Thor");
+        AddMechInstanceSalvage("Thanatos");
+        
+        AddWeaponToMarket("ClanLRM20",2);
+        AddWeaponToMarket("Thunderbolt",1);
+        AddWeaponToMarket("ERPPC",2);
+        AddWeaponToMarket("ERLargeLaser",2);
+        AddWeaponToMarket("LightGauss",1);
+
+
+        AddMechToMarket("Bushwacker");
+      //
+      
+        
+        endmission(true,33);
+        
+        if (rebelsdied) then
+            endmission(true,17);
+        endif;
+        
+        trans won;
+        
+    endif;
+    
+// Fail the mission when the player dies
+	if (isdead(playermech)) then
+		KillVoiceOvers;
+		PlayVoiceOverOnce("VOX\Generic\EriDestroyed2",talker_MAN);
+		StartMusic("Music\Defeat",3.0,3.5,70);
+		endmission(false,14);
+        cinema_cut = 20;    // This is so it will go to state lost and just sit there
+		Trans Lost;
+	endif;
+
+// Fail the mission when the tech convoy is destroyed
+
+    if (obj3revealed) then
+        if (groupalldead(GroupObjectID(2))) then
+            failobjective(eob_objective3);
+            
+            if (obj4revealed) then
+                if (not obj4) then
+                    failobjective(eob_objective4);
+                endif;
+            endif;
+			
+			// Probably need an audio here about the convoy dying..
+            PlayVoiceOverOnce("VOX\Generic\VehicleDead", TALKER_MAN);
+			
+            if (not obj1a) then
+                failobjective(eob_objective1a);
+            endif;
+            endmission(false,10);
+        endif;
+    endif;
+
+endstate;
+
+//-----------------------------------------
+//HERE THERE BE CINEMAS
+//-----------------------------------------
+
+state opening;
+
+	code
+
+    if (cinemaskip) then
+        Shutdown(eve_farpatrol_bx1);
+        //Shutdown(eve_farpatrol_bx2);
+        Shutdown(eve_farpatrol_gx2);
+        Shutdown(eve_farpatrol_gx3);
+        GetLocation(ena_bx1,TempPoint);
+        teleport(eve_farpatrol_bx1,TempPoint);
+        //GetLocation(ena_bx2,TempPoint);
+        //teleport(eve_farpatrol_bx2,TempPoint);
+        GetLocation(ena_gx2,TempPoint);
+        teleport(eve_farpatrol_gx2,TempPoint);
+        GetLocation(ena_gx3,TempPoint);
+        teleport(eve_farpatrol_gx3,TempPoint);
+        Destroy(eve_farpatrol_gx2);
+        Destroy(eve_farpatrol_gx3);
+        startup(GroupObjectID(51));
+        KillVoiceOvers;
+        cinema_cut = 0;
+        KillTimer(gti_timer_17);
+        SetGlobalTrigger(0,true);
+        playerai(epl_player0,false);
+        CinemaEnd;
+        SetCompositingEnabled(True);
+        starttimer(9);
+    
+        PlayVoiceOverOnce("VOX\OP2\MI4\Intro", TALKER_MAN);
+        PlayVoiceOverOnce("VOX\OP2\MI4\Intro", TALKER_ERI);
+        if (GetEventFlag("SKIES_CLEARED")) then
+                PlayVoiceOverOnce("VOX\OP2\MI4\Intro3", TALKER_MAN);
+                PlayVoiceOverOnce("VOX\OP2\MI4\Intro3", TALKER_ERI);
+            else
+                PlayVoiceOverOnce("VOX\OP2\MI4\Intro2", TALKER_MAN);
+                PlayVoiceOverOnce("VOX\OP2\MI4\Intro2", TALKER_ERI);
+        endif;
+
+        revealobjective(eob_objective1a);
+        // revealobjective(eob_objective2);
+        revealobjective(eob_objective2a);
+        
+        trans sit;
+        
+    endif;
+
+ 	switch (cinema_cut)
+			
+			case 0:
+                SetCompositingEnabled(False);
+                starttimer(gti_timer_17);
+                playerai(epl_player0,false);
+                
+    			CinemaStart;
+
+                GetLocation(ena_stage1,TempPoint);
+                Teleport(eve_farpatrol_bx1,TempPoint);
+                Startup(eve_farpatrol_bx1);
+                //GetLocation(ena_stage2,TempPoint);
+                //Teleport(eve_farpatrol_bx2,TempPoint);
+                //Startup(eve_farpatrol_bx2);
+                GetLocation(ena_stage4,TempPoint);
+                Teleport(eve_farpatrol_gx2,TempPoint);
+                Startup(eve_farpatrol_gx2);
+                GetLocation(ena_stage5,TempPoint);
+                Teleport(eve_farpatrol_gx3,TempPoint);
+                Startup(eve_farpatrol_gx3);
+                Shutdown(GroupObjectID(51));
+                
+                OrderFormationMove(GroupObjectID(33),epa_movie1,60,move_nocycle,FORMATION_2x6line,formtype_normal,true);
+                OrderFormationMove(GroupObjectID(35),epa_movie2,60,move_nocycle,FORMATION_2x6line,formtype_normal,true);
+                
+
+                SetActiveCamera (eca_CameraShip);
+                
+                FadeToBlack(0.0);
+                FadeFromBlack(6.0);
+                
+                TargetFollowObject(ede_babybaby);
+                CameraFollowObject(ede_babybaby);
+                
+                TargetOffset(-330.0,0.0,-450.0,0.0,false);
+                TargetOffset(300.0,0.0,450.0,12.0,false);
+                CameraOffset(0.0,40.0,0.0,0.0,true);
+                CameraOffset(100.0,10.0,0.0,12.0,true);
+
+                PlayVoiceOverOnce("VOX\OP2\MI4\Intro", TALKER_MAN);
+                PlayVoiceOverOnce("VOX\OP2\MI4\Intro", TALKER_ERI);
+                if (GetEventFlag("SKIES_CLEARED")) then
+                        PlayVoiceOverOnce("VOX\OP2\MI4\Intro3", TALKER_MAN);
+                        PlayVoiceOverOnce("VOX\OP2\MI4\Intro3", TALKER_ERI);
+                    else
+                        PlayVoiceOverOnce("VOX\OP2\MI4\Intro2", TALKER_MAN);
+                        PlayVoiceOverOnce("VOX\OP2\MI4\Intro2", TALKER_ERI);
+                endif;
+                
+                cinema_cut = cinema_cut + 1;
+                
+            endcase;
+			
+			case 1:
+                if timegreater(17,20) then
+                    TargetFollowObject(ebu_communications_array);
+                    CameraFollowObject(ebu_communications_array);
+                    TargetOffset(0.0,25.0,0.0,0.0,false);
+                    TargetOffset(0.0,10.0,5.0,12.0,false);
+                    CameraOffset(-130.0,5.0,-130.0,0.0,true);
+                    CameraOffset(-50.0,25.0,-50.0,18.0,true);
+                    /* TargetOffset(0.0,15.0,0.0,0.0,false);
+                    TargetOffset(0.0,10.0,50.0,12.0,false);
+                    CameraOffset(-170.0,25.0,60.0,0.0,true);
+                    CameraOffset(-110.0,15.0,-140.0,18.0,true); */
+                    
+                    cinema_cut = cinema_cut + 1;
+                endif;
+			endcase;
+
+			case 2:
+                if timegreater(17,40) then
+                    TargetFollowObject(playermech);
+                    CameraFollowObject(playermech);
+                    TargetOffset(0.0,4.0,0.0,0.0,false);
+                    TargetOffset(0.0,8.0,0.0,12.0,false);
+                    CameraOffset(100.0,55.0,120.0,0.0,true);
+                    CameraOffset(-200.0,10.0,-50.0,18.0,true);
+                    
+                    cinema_cut = cinema_cut + 1;
+                endif;
+			endcase;
+
+			case 3:
+                if (timegreater(17,54)) then
+                    Shutdown(eve_farpatrol_bx1);
+                    //Shutdown(eve_farpatrol_bx2);
+                    Shutdown(eve_farpatrol_gx2);
+                    Shutdown(eve_farpatrol_gx3);
+                    GetLocation(ena_bx1,TempPoint);
+                    teleport(eve_farpatrol_bx1,TempPoint);
+                    //GetLocation(ena_bx2,TempPoint);
+                    //teleport(eve_farpatrol_bx2,TempPoint);
+                    GetLocation(ena_gx2,TempPoint);
+                    teleport(eve_farpatrol_gx2,TempPoint);
+                    GetLocation(ena_gx3,TempPoint);
+                    teleport(eve_farpatrol_gx3,TempPoint);
+                    Destroy(eve_farpatrol_gx2);
+                    Destroy(eve_farpatrol_gx3);
+                    startup(GroupObjectID(51));
+                    
+                    KillVoiceOvers;
+                    cinema_cut = 0;
+                    ResetTimer(gti_timer_17);
+                    SetGlobalTrigger(0,true);
+                    playerai(epl_player0,false);
+                    starttimer(9);
+
+                    CinemaEnd;
+                    SetCompositingEnabled(True);
+
+                    revealobjective(eob_objective1a);
+                    // revealobjective(eob_objective2);
+                    revealobjective(eob_objective2a);
+                    
+                    trans sit;
+                endif;
+			endcase;
+		
+        endswitch;
+	
+endstate;
+
+state won;
+
+        // set target desire of player and lancemates to 
+        // this should be modified to include lancemates... - davelueh
+        // settargetdesirability(playermech,-1);
+
+		code
+
+			if (cinemaskip) then
+				cinema_cut = 20;
+				resettimer (gti_Timer_21);
+				killtimer(gti_timer_21);
+				endmission(true,1);	
+				trans hang;
+			endif;
+
+		switch cinema_cut
+		
+			case 0:	
+            	SetCompositingEnabled(False);
+                playerai(epl_player0,true);
+                Starttimer(28);
+                Resettimer(28);
+                Cinema_cut=Cinema_cut+1;
+            endcase;
+			
+			case 1:
+				//if (timegreater(28,4)) then
+                    CinemaStart;
+    				enableglobalinvulnerable;
+    				settargetdesirability(playermech,-1);
+                    SetGlobalTrigger(42,true);
+                    setactivecamera (eca_cameraship);
+                    //Fadetoblack(7.0);
+                    Targetfollowobject(playermech);
+                    Camerafollowobject(playermech);
+                    Targetoffset(0.0,4.0,0.0,0.0,false);
+                    Cameraoffset(-30.0,125.0,75.0,0.0,false);
+                    Cameraoffset(75.0,20.0,5.0,57.0,false);
+                    Cinema_cut=Cinema_cut+1;
+                //endif;
+            endcase;
+
+			case 2:	
+                if (timegreater(28,6)) then
+                    StartMusic("Music\Victory2",3.0,3.5,50);
+                    Cinema_cut=Cinema_cut+1;
+                endif;
+			endcase;
+			
+		endswitch;
+	
+endstate;
+
+state hang;
+    code
+endstate;
+
+state lost;
+
+		code
+		
+		switch cinema_cut
+		
+			case 0:	
+				SetCompositingEnabled(False);
+                CinemaStart;
+				Fadefromblack(3.0);
+				playerai(epl_player0,true);
+				ClearMoveOrder(playermech);
+				setactivecamera (eca_cameraship);
+				//Fadetoblack(7.0);
+                SetGlobalTrigger(42,true);
+				Targetfollowobject(playermech);
+				Camerafollowobject(playermech);
+				Targetoffset(0.0,7.0,0.0,0.0,false);
+				Cameraoffset(20.0,100.0,-90.0,0.0,false);
+				Cameraoffset(-100.0,30.0,100.0,12.0,false);
+				startTimer (gti_Timer_21);
+				resettimer (gti_Timer_21);
+                
+                cinema_cut=cinema_cut+1;
+			endcase;
+			
+			case 1:
+			
+			endcase;
+			
+		endswitch;
+	
+endstate;
+
+
+endfsm.
+//******************************************************************
+

@@ -1,0 +1,159 @@
+
+//------------------------------------------------------------------
+// NOTE: The fsm name below MUST be changed in order for the
+// script to be considered a unique entity!
+
+fsm taskforce : integer;
+
+
+//------------------------------------------------------------------
+// Task Force:
+//   This script controls the culturals that disembark from the 
+//   helicopter to get Mechs, vehicles, and supplies.
+//------------------------------------------------------------------
+
+
+
+//------------------------------------------------------------------
+//     Constants
+//------------------------------------------------------------------
+
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//     Types
+//------------------------------------------------------------------
+
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//     Variables
+//------------------------------------------------------------------
+
+	var
+		static integer			attackRange;		// At what range do I start shooting?
+		static integer			withdrawRange;		// At what range do I withdraw from combat completely?
+
+		static integer			piloting;			// Piloting skill
+		static integer			gunnery;			// Gunnery skill/chance to hit
+		static real				minDelay;			// Minimum amount of time I will wait between shots once a weapon is reloaded
+		static real				maxDelay;			// Maximum amount of time I will wait between shots once a weapon is reloaded
+		static integer 			eliteLevel;			// Elite level.  This helps determine tactics, defensive manuevers, opportunity fire
+    													// and other things.  It indicates a general level of combat experience.
+		static integer			attackThrottle;		// My attack throttle
+		static integer			findTypes;			// What kind of enemies to look for
+
+ 		static integer			isShotRadius;		// How far away from me will I detect an enemy shot?
+
+		static integer 			attackSound;		// The attack sound I play when I first attack
+		static integer 			deathSound;			// The sound I play when I die
+		
+		static integer			mood;				// My default mood.
+
+		static integer			takeOffDistance;	// My take-off distance if I'm an airplane (ignored if not an airplane)
+        static integer          speed;              // Speed to target
+        static integer          myobject;           // Where the object is travelling
+
+//------------------------------------------------------------------
+//     Init: my initialization function
+//------------------------------------------------------------------
+
+function Init;
+	code
+		// script-specific variables
+		attackRange		= 900;
+		withdrawRange	= attackRange * 3 / 2;
+		takeOffDistance	= 450;
+
+		// driver settings
+		piloting		= 90;
+		gunnery			= 220;
+		minDelay		= 0.1;
+		maxDelay		= 0.4;
+		eliteLevel		= 90;
+		attackThrottle	= 90;
+		isShotRadius	= 120;
+		attackSound		= -1; // no sound
+		deathSound		= -1; // no sound
+		mood			= NEUTRAL_START;
+		findTypes		= FT_DEFAULT;
+
+		if (GetMemoryInteger(me,9)==0) then         // Integer 0 = Ambush Mechs at Nav Alpha
+		    piloting		= 80;
+		    gunnery			= 80;
+	    	minDelay		= 0.1;
+    		maxDelay		= 0.4;
+            eliteLevel		= 90;
+            speed           = 25;
+            myobject        = ena_chopperdrop;
+		endif;
+
+endfunction;
+
+//------------------------------------------------------------------
+//	StartState: my initial state
+//------------------------------------------------------------------
+
+state StartState;
+
+	code
+		SetFiringDelay			(ME,minDelay,maxDelay);
+		SetIgnoreFriendlyFire	(ME,true);
+		SetIsShotRadius			(ME,isShotRadius);
+		SetEntropyMood			(ME,mood);
+		SetCurMood				(ME,mood);
+		SetSkillLevel			(ME,piloting,gunnery,eliteLevel);
+		SetAttackThrottle		(ME,attackThrottle);
+
+        trans waiting;
+        
+endstate;
+
+//------------------------------------------------------------------
+//	Waiting: Wait for the helicopter to land
+//------------------------------------------------------------------
+
+state waiting;
+    code
+				
+			// if (GammaAttack) then
+                trans destination;
+            // endif;
+
+endstate;
+
+//------------------------------------------------------------------
+//	Destination: Cultural goes to destination
+//------------------------------------------------------------------
+
+state Destination;
+    code
+
+        OrderMovetoObject(myobject,speed);
+        
+        // if (OrderMovetoObject(myobject,speed)) then
+        //    teleporttohell(me);
+        //endif;
+
+endstate;
+
+//------------------------------------------------------------------
+//	DeadState: OK, I kicked the bucket.
+//------------------------------------------------------------------
+
+state DeadState;
+	code
+		if (deathSound <> -1) then	
+			PlaySoundOnce(deathSound);
+		endif;		
+
+		orderDie;
+
+endstate;
+
+
+endfsm.
+

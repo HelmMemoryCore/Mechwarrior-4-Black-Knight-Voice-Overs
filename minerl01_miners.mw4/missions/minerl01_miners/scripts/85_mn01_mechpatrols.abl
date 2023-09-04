@@ -1,0 +1,307 @@
+
+//*********************************************************************************
+//The below line MUST be changed in order for the script to be considered
+//a unique entity.  The word Patrol must be changed to some other unique identifier
+fsm Mn01_MechPatrols : integer;
+
+//This unit patrols a specific path and attacks anything that comes near it.
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//
+//     Variable Declarations
+//
+//------------------------------------------------------------------
+	var
+	static integer			attackrange; 			// When do I start shooting?
+	static integer			ShutdownRange; 		// When do I start shooting?
+																
+	static integer			piloting; 				// piloting skill
+	static integer			gunnery; 					// hit chance,
+	static real					mindelay;					// minimum amount of time I will wait between shots once a weapon is reloaded
+	static real					maxdelay;					// maximum amount of time I will wait between shots once a weapon is reloaded
+	static integer 			speed;			 			// What speed so I move at?
+	static integer 			elitelevel; 			// % elite chance, This helps determine tactics, defensive manuevers, opportunity fire
+	static integer 			AttackThrottle;																			// and other things that would normally be determined by combat experience
+
+ 	static integer			isshotradius;			// how far away from me will I detect an enemy shot.
+	static integer			movetype;					// how will it move down the path?
+
+	static Boolean 			attacksoundplayed;
+	static integer 			attacksound; 			// plays when it first attacks
+	static integer 			deathsound; 			// plays when it dies
+	
+	static integer			mood;							// What is my normal mood?
+	
+	static Boolean			Resumed;					// Have I gotten to the end of the path?
+	static Boolean			reachedendofpath;			// Have I gotten to the end of the path?
+																						// Note: This only gets set if movetype is set to move_nocycle.
+	static integer			path;						 			// what path am I following?
+	static Boolean 			attackersdistractit;	// if FALSE, it won't leave the path, even when things
+																						// are shooting it. It will shoot back. Defaults to true
+																						// Once unit reaches the end of the path, It attacks freely.
+	static Boolean 			Chaser;								// These guys will give chase
+	static Boolean 			Elite;								// Left from other script
+	
+	static integer			teleportNav;					// All the elites will have this value set to a different Nav
+	
+	static ObjectID 		myPrison;
+//------------------------------------------------------------------
+//
+//     Local Functions
+//
+//------------------------------------------------------------------
+
+function init;
+	code
+	
+	Elite 								= FALSE;
+	 				
+ 	switch (GetMemoryInteger(me,9))
+
+	case 7:															 //Mech at the Mountain Path
+	
+		attackrange					= 875;
+		piloting 				 	= 20;				
+		gunnery 				 	= 30;					
+		mindelay 					= 0.5;				
+		maxdelay 					= 1.0;				
+		speed 						= 50;					//was 60 8/19 	
+		AttackThrottle				= 50;
+		elitelevel 					= 50;			    //was 60 8/19
+		IsShotRadius 				= 80;
+		movetype 					= MOVE_SEESAW;
+		AttackersDistractIt 		= True;
+		Mood 						= neutral_start;
+		path 						= epa_Path_Mount;
+		ReachedEndOfPath 		 	= False;
+		Resumed 					= False;
+		Attacksoundplayed 			= False;					
+		
+	endcase;
+		
+	case 10:															 //Shadowcat_Tank in crater
+			
+		Elite 							= TRUE;
+		ShutdownRange       = 150;
+		attackrange         = 750;
+		piloting            = 70;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= MOVE_SEESAW;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Tanks;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		
+	endcase;
+		
+	case 20:						 									//Mech with Escaping Convoy
+		
+		attackrange         = 900;
+		piloting            = 20;
+		gunnery             = 30;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		AttackThrottle		= 50;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= MOVE_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Escape;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		
+	endcase;
+		
+	case 21:						 									//(was Cougar) now OSIRIS in North section of base
+		
+		attackrange         = 850;
+		piloting            = 20;
+		gunnery             = 30;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed 				= 50;					//was 60 8/19 	
+		AttackThrottle		= 50;
+		elitelevel 					= 50;			    //was 60 8/19
+		IsShotRadius        = 80;
+		movetype 						= MOVE_SEESAW;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_North;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		
+	endcase;
+		
+	case 22:															//(was Cougar) now OSIRIS in South section of base
+	
+		attackrange					= 850;
+		piloting 				 	= 20;				
+		gunnery 				 	= 30;					
+		mindelay 					= 0.5;				
+		maxdelay 					= 1.0;				
+		speed 						= 50;
+		AttackThrottle				= 50;					//was 60 8/19 	
+		elitelevel 					= 50;			    //was 70 8/19
+		IsShotRadius 				= 80;
+		movetype 					= MOVE_SEESAW;
+		AttackersDistractIt 		= True;
+		Mood 						= neutral_start;
+		path 						= epa_Path_South;
+		ReachedEndOfPath 			= False;
+		Resumed 					= False;
+		Attacksoundplayed 			= False;					
+		//Chaser						= True;
+		//teleportnav 				= ena_navElite1;								//Kick some Rescue Ass
+		//myPrison					= eve_Cargotrack1;
+		
+	endcase;
+
+	endswitch;
+ 	
+endfunction;
+
+//------------------------------------------------------------------
+//
+//     Main Code
+//				
+//								
+//------------------------------------------------------------------
+state startState;
+
+	code
+		SetFiringDelay			(me,mindelay,maxdelay);
+		setignorefriendlyfire	(me,true);
+		setisshotradius			(me,isshotradius);
+		setentropymood			(me,mood);
+		setcurmood				(me,mood);
+		setskilllevel			(me,piloting,gunnery,elitelevel);
+		setattackthrottle		(me,attackThrottle);
+		//setsearchlight				(me,on);
+		//startexecute					(me);
+		//setalignment					(me,enemy);
+		
+		if (Elite == True) then
+			shutdown(me);
+			//trans hangout;
+			trans patrol;
+		else
+			trans patrol;
+		endif;
+endstate;			
+
+state deadState;
+  code
+						
+		orderDie;
+endstate;
+
+	state patrol;
+
+  var
+    ObjectID foe;
+
+		code
+	If (GetMemoryInteger(me,9) == 20) then			// davelueh modified this slightly by removing the follow path command for the convoy escort mech, I think it is posible for this mech to escape the player by accident making the player have to go hunt him, this way he won't walk but will just wait around in the base until he see's a target.
+		//If BaseFight == TRUE then
+			//if (path <> -1) then
+			//	orderMoveto(path,speed,movetype,true,true);
+			//endif;
+		//else
+			OrderMoveLookOut;
+		//endif;
+	
+	else
+	
+	//head down the path.  If this has already been done
+	// or if there is no path set then look around.
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+					if ((orderMoveto(path,speed,movetype,true,true)) == TRUE) then
+						reachedendofpath = TRUE;
+					endif; 			
+			else	 		 		
+				ordermovelookout;			
+			endif;
+	endif;
+			
+		//Find me a target
+		if (setmytarget(attackrange)) then
+			//BaseFight = true;
+			trans attack;
+	 	endif;
+			
+	endstate;
+
+//------------------------------------------------------------------
+//
+//     attack state : description
+//
+//------------------------------------------------------------------
+	state attack;
+		
+		code
+		
+		If (BaseFight == FALSE) then
+			If (GetMemoryInteger(me,9) == 20) then
+				If (GetTarget(me) == (playermech)) then
+					BaseFight = TRUE;
+				endif;
+			endif;
+		endif;
+		
+		speed = 600;						//Changed from 600 to 60 to keep 'em slow
+		
+		if (LeaveAttackState(attackrange*2)) then
+			orderstopattacking;
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,true);
+			else
+				trans patrol;
+			endif;
+		endif;
+		
+		//the ever popular attack order
+    orderAttack (attackersdistractit);
+		
+		//play the attack sound if one exists
+		if ((attacksound <> -1) and (attacksoundplayed == FALSE)) then	
+			attacksoundplayed = true;
+			PlaySoundOnce(attacksound);
+		endif;	
+		
+		//maybe swap targets when I am shot.
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 								
+	endstate;
+
+endfsm.
+//******************************************************************
+

@@ -1,0 +1,673 @@
+
+//*********************************************************************************
+
+fsm gauntlet : integer;		
+
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+     const
+
+		#include_ <content\ABLScripts\mwconst.abi>
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+     type
+
+		#include_ <content\ABLScripts\mwtype.abi>
+
+//------------------------------------------------------------------
+//
+//     Variable Declarations
+//
+//------------------------------------------------------------------
+      var
+			
+		eternal integer     playermech;
+		
+        // Standard Nav and Objective Variables
+        static boolean	    alphareached;       // Nav Alpha reached
+        static boolean	    betareached;        // Nav Beta reached
+        static boolean	    gammareached;       // Nav Gamma reached
+        static boolean	    deltareached;       // Nav Delta reached
+		                                        //
+        static boolean	    alpharevealed;      // Nav Alpha is shown
+        static boolean	    betarevealed;       // Nav Beta is shown
+        static boolean	    gammarevealed;      // Nav Gamma is shown
+        static boolean	    deltarevealed;      // Nav Delta is shown
+        static integer      checkrange;         // How far from the Nav Point you have to be                                            
+                                                //
+        eternal boolean     obj1;               // This indicates whether Obj 1 was completed
+        eternal boolean     obj2;               // This indicates whether Obj 2 was completed
+        eternal boolean     obj3;               // This indicates whether Obj 3 was completed
+        eternal boolean     obj4;               // This indicates whether Obj 4 was completed
+                                                //
+        static boolean      obj1revealed;       // This indicates that Obj 1 has been revealed
+        static boolean      obj2revealed;       // This indicates that Obj 2 has been revealed
+        static boolean      obj3revealed;       // This indicates that Obj 3 has been revealed
+        static boolean      obj4revealed;       // This indicates that Obj 4 has been revealed
+        //    
+		
+		static integer	    cinema_cut;
+        eternal boolean     alphaattack;        // When the Alpha Mechs will pounce
+        eternal boolean     betaattack;         // When the Beta Mechs will pounce
+        eternal boolean     gammaattack;        // When the Gamma Mechs will pounce
+        static boolean      repairgone;         // The jet has bombed the repair bay
+        static integer      objdone;            // The number of objectives completed
+        eternal boolean     startgame;          // The intro movie is over
+
+//------------------------------------------------------------------
+//
+//     Init Function    (automatically run first time through)
+//
+//------------------------------------------------------------------
+
+function init;
+	var
+		integer i;
+
+	code
+
+		    playermech = getplayervehicle(epl_player0);	
+
+            if (GetLancemate(1)<>NO_UNIT) then
+                GroupAddObject(GroupObjectId(2),GetLancemate(1));
+            endif;
+
+            if (GetLancemate(2)<>NO_UNIT) then
+                GroupAddObject(GroupObjectId(2),GetLancemate(2));
+            endif;
+
+            if (GetLancemate(3)<>NO_UNIT) then
+                GroupAddObject(GroupObjectId(2),GetLancemate(3));
+            endif;
+ 	
+			GroupAddObject(GroupObjectId(1),playermech);
+
+            // Hammer Lance
+            GroupAddObject(GroupObjectId(3),eve_Cain);
+            GroupAddObject(GroupObjectId(3),eve_Hammer_Two);
+            SetGroupAI(groupobjectid(3),GROUPAI_MOODSQUAD);
+
+            // Voltrat 3 Training Facility
+            GroupAddObject(GroupObjectId(10),ebu_Barracks);
+            GroupAddObject(GroupObjectId(10),ebu_Mech_Hangar);
+            GroupAddObject(GroupObjectId(10),ebu_vehicle_hangar);
+            GroupAddObject(GroupObjectId(10),ebu_vehicle_hangar2);
+            
+            // Enemies at beginning - Nav Gamma
+            GroupAddObject(GroupObjectId(20),eve_ambush1_1);
+            GroupAddObject(GroupObjectId(20),eve_ambush1_2);
+            //GroupAddObject(GroupObjectId(20),eve_ambush1_3);
+            GroupAddObject(GroupObjectId(20),eve_ambush1_4);
+            SetGroupAI(groupobjectid(20),GROUPAI_MOODSQUAD);
+            
+            GroupAddObject(GroupObjectId(21),eve_ambush2_1);
+            GroupAddObject(GroupObjectId(21),eve_ambush2_2);
+            SetGroupAI(groupobjectid(21),GROUPAI_MOODSQUAD);
+            
+            GroupAddObject(GroupObjectId(22),eve_ambush3_1);
+            GroupAddObject(GroupObjectId(22),eve_ambush3_2);
+            GroupAddObject(GroupObjectId(22),eve_ambush3_3);
+            GroupAddObject(GroupObjectId(22),eve_ambush3_4);
+            SetGroupAI(groupobjectid(22),GROUPAI_MOODSQUAD);
+            
+            GroupAddObject(GroupObjectId(23),eve_ambush4_1);
+            GroupAddObject(GroupObjectId(23),eve_ambush4_2);
+            SetGroupAI(groupobjectid(23),GROUPAI_MOODSQUAD);
+            
+            GroupAddObject(GroupObjectId(24),eve_ambush5_1);
+            GroupAddObject(GroupObjectId(24),eve_ambush5_2);
+            SetGroupAI(groupobjectid(24),GROUPAI_MOODSQUAD);
+            
+            GroupAddObject(GroupObjectId(30),eve_ambush1_1);
+            GroupAddObject(GroupObjectId(30),eve_ambush1_2);
+            //GroupAddObject(GroupObjectId(30),eve_ambush1_3);
+            GroupAddObject(GroupObjectId(30),eve_ambush1_4);
+            GroupAddObject(GroupObjectId(30),eve_ambush2_1);
+            GroupAddObject(GroupObjectId(30),eve_ambush2_2);
+            GroupAddObject(GroupObjectId(30),eve_ambush3_1);
+            GroupAddObject(GroupObjectId(30),eve_ambush3_2);
+            GroupAddObject(GroupObjectId(30),eve_ambush3_3);
+            GroupAddObject(GroupObjectId(30),eve_ambush3_4);
+            //GroupAddObject(GroupObjectId(30),eve_ambush4_1);
+            //GroupAddObject(GroupObjectId(30),eve_ambush4_2);
+            //GroupAddObject(GroupObjectId(30),eve_ambush5_1);
+            //GroupAddObject(GroupObjectId(30),eve_ambush5_2);
+
+            GroupAddObject(GroupObjectId(31),eve_ambush4_1);
+            GroupAddObject(GroupObjectId(31),eve_ambush4_2);
+            GroupAddObject(GroupObjectId(31),eve_ambush5_1);
+            GroupAddObject(GroupObjectId(31),eve_ambush5_2);
+            GroupAddObject(GroupObjectId(31),eve_ambush5_3);
+            
+		cinema_cut = 0; 						
+		
+endfunction;
+
+//------------------------------------------------------------------
+//
+//     Main Code
+//
+//------------------------------------------------------------------
+state StartState;
+
+	code	
+		setactivationdistance(1200);
+
+        setradarnav(ena_Nav_Beta,2);
+        setradarnav(ena_Nav_Gamma,3);
+        setradarnav(ena_Nav_Epsilon,5);
+
+        revealnavpoint(ena_Nav_Beta);
+        revealnavpoint(ena_Nav_Gamma);
+        setnavpoint(ena_Nav_Gamma);
+        
+        SetTargetDesirability(eve_airplane,-1);
+
+        revealobjective(eob_objective1);
+        revealobjective(eob_objective3);
+        
+        KillVoiceOvers;
+        
+        checkrange=150;
+
+        StartMusic("Music\Mystic",3.0,3.5,70);
+
+        //trans won;
+	    trans opening;
+
+endstate;
+
+	
+state deadState;
+	code
+endstate;
+	
+//------------------------------------------------------------------
+//
+//     Sit state : description
+//
+//------------------------------------------------------------------
+state sit;
+
+	code
+
+    if IsMusicPlaying == false then
+    	StartMusic("music\LavaAmbLoop",0.0,3.0,40);
+    endif;
+
+// Triggers
+    if (not alphaattack) then
+        if (not iswithin(playermech,ena_ambushpoint,800)) then
+            AlphaAttack=true;
+        else
+            if (isshot(GroupObjectID(20))) then
+                AlphaAttack=true;
+            endif;
+        endif;
+    endif;
+    
+    if (not betaattack) then
+        if (iswithin(playermech,ena_beta_2,1200)) then
+            BetaAttack=true;
+        endif;
+    endif;
+
+    if (not GammaAttack) then
+        if (AlphaAttack) then
+            if (iswithin(playermech,ena_gamma_2,1200)) then
+                GammaAttack=true;
+                StartMusic("Music\Push",3.5,3.0,50);
+                starttimer(4);  // This is to blow them up some
+            endif;
+        endif;
+    endif;
+    
+    if (GammaAttack) then
+        if (timegreater(4,1)) then
+            killtimer(4);
+            destroy(ebu_boom1);
+            destroy(ebu_boom2);
+        endif;
+    endif;
+
+    if (GammaAttack) then       // This is the trigger for the airplane destroying the repair thingy
+        if (not RepairGone) then
+            if (isdead(eve_airplane)) then
+                repairgone=true;
+            endif;
+        endif;
+    endif;
+    
+    if (GammaAttack) then
+        if (not RepairGone) then
+            if (iswithin(eve_airplane,eve_repair_1,100)) then
+                destroy (eve_repair_1);
+                destroy (ebu_repair_2);
+                destroy (ebu_repair_3);
+                destroy (ebu_Communications_Tower);
+                repairgone=true;
+            endif;
+        endif;
+    endif;
+    
+// Sound Triggers
+
+    if (not GetGlobalTrigger(1)) then       // This is when Cain theoretically engages Steiner forces at
+                                            // Nav Alpha.
+        if (timegreater(1,60)) then
+            SetGlobalTrigger(1,true);
+            PlayVoiceOverOnce("VOX\OP5\MI2\Hammer",talker_CAI);
+            PlayVoiceOverOnce("VOX\OP5\MI2\Hammer",talker_ERI);
+            PlayVoiceOverOnce("VOX\OP5\MI2\Hammer2",talker_CAI);
+        endif;
+    endif;
+    
+    if (not GetGlobalTrigger(2)) then       // Eric says he in engaging forces as soon as he fires
+        if (WhoShot(GroupObjectID(30))==playermech) then
+            SetGlobalTrigger(2,true);
+            PlayVoiceOverOnce("VOX\OP5\MI2\Ahead",talker_ERI);
+        endif;
+    endif;
+    
+    if (not GetGlobalTrigger(3)) then       // Lancemates running into resistance up ahead
+        if (timegreater(1,20)) then
+            SetGlobalTrigger(3,true);
+            PlayLancemateSound("VOX\OP5\MI2\Resist",1);
+        endif;
+    endif;
+    
+    if (not GetGlobalTrigger(4)) then       // All enemies killed at the beginning
+        if (GroupAllDead(GroupObjectID(20))) then
+            if (not GammaReached) then
+                SetGlobalTrigger(4,true);
+                PlayVoiceOverOnce("VOX\OP5\MI2\Dispatched",talker_ERI);
+                StartMusic("Music\Indecision",3.5,3.0,50);
+            endif;
+        endif;
+    endif;
+
+    if (not GetGlobalTrigger(5)) then       // Reached Gamma VO
+        if (gammareached) then
+            SetGlobalTrigger(5,true);
+            PlayVoiceOverOnce("VOX\OP5\MI2\Gamma",talker_ERI);
+            PlayVoiceOverOnce("VOX\OP5\MI2\Gamma",talker_BAD);
+        endif;
+    endif;
+    
+    if (not GetGlobalTrigger(6)) then       // Reached Beta VO
+        if (iswithin(playermech,ena_nav_beta,300)) then
+            SetGlobalTrigger(6,true);
+            PlayVoiceOverOnce("VOX\OP5\MI2\Report",talker_BAD);
+            PlayVoiceOverOnce("VOX\OP5\MI2\Barracks",talker_ERI);
+            Starttimer(2);      // This is the timer for Cain to be in trouble
+        endif;
+    endif;
+
+    if (not GetGlobalTrigger(7)) then       // This is when Cain gets in trouble at Nav Epsilon
+        if (timegreater(1,180)) then
+            SetGlobalTrigger(7,true);
+            RevealNavpoint(ena_Nav_Epsilon);
+            PlayVoiceOverOnce("VOX\OP5\MI2\Hand",talker_CAI);
+            PlayVoiceOverOnce("VOX\OP5\MI2\Down",talker_ERI);
+        else
+            if (timegreater(2,15)) then
+                SetGlobalTrigger(7,true);
+                RevealNavpoint(ena_Nav_Epsilon);
+                PlayVoiceOverOnce("VOX\OP5\MI2\Hand",talker_CAI);
+                PlayVoiceOverOnce("VOX\OP5\MI2\Down",talker_ERI);
+            endif;
+        endif;
+    endif;
+    
+    if (not GetGlobalTrigger(10)) then      // Delay the message for Cain needing help
+        if (timegreater(1,360)) then
+            SetGlobalTrigger(10,true);
+            PlayVoiceOverOnce("VOX\OP5\MI2\Down",talker_BAD);
+            //PlayVoiceOverOnce("VOX\OP5\MI2\Down",talker_ERI);
+            //RevealNavpoint(ena_Nav_Epsilon);
+            RevealObjective(eob_objective4);
+        else
+            if (timegreater(2,35)) then
+                SetGlobalTrigger(10,true);
+                PlayVoiceOverOnce("VOX\OP5\MI2\Down",talker_BAD);
+                //PlayVoiceOverOnce("VOX\OP5\MI2\Down",talker_ERI);
+                //RevealNavpoint(ena_Nav_Epsilon);
+                RevealObjective(eob_objective4);
+            endif;
+        endif;
+    endif;
+
+    if (gammaattack) then
+        if (not GetGlobalTrigger(8)) then       // Airplane swoop in
+            if (iswithin(playermech,eve_airplane,800)) then
+                SetGlobalTrigger(8,true);
+                PlayVoiceOverOnce("VOX\OP5\MI2\Fast",talker_ERI);
+            endif;
+        endif;
+    endif;
+    
+    if (GetGlobalTrigger(8)) then
+        if (not GetGlobalTrigger(9)) then       // Airplane blew up the repair gantry
+            if (isdead(eve_repair_1)) then
+                if (iswithin(playermech,ena_nav_beta,500)) then
+                    SetGlobalTrigger(9,true);
+                    PlayVoiceOverOnce("VOX\OP5\MI2\NoRepairs",talker_ERI);
+                endif;
+            endif;
+        endif;
+    endif;
+    
+// Objective 1 - Kill all the enemies defending the Facility
+
+    if (not obj1) then
+        if (GroupAllDead(GroupObjectID(30))) then
+            successobjective(eob_objective1);
+            obj1 = true;
+            objdone = objdone + 1;
+        endif;
+    endif;
+    
+// FAUX Objective 2 - Reunite with Lancemates - No longer displayed
+
+    if (not Obj2) then
+        if (iswithin(playermech,GroupObjectID(2),700)) then
+            PlayVoiceOverOnce("VOX\OP5\MI2\GoodSee",talker_ERI);
+            // successobjective(eob_objective2);
+            obj2=true;
+        endif;
+    endif;
+
+// Objective 3 - Destroy the Training Facilities
+
+    if (not Obj3) then
+        if (GroupAllDead(GroupObjectID(10))) then
+            successobjective(eob_objective3);
+            RevealNavpoint(ena_Nav_Epsilon);
+            SetNavpoint(ena_Nav_Epsilon);
+            RevealObjective(eob_objective4);
+            obj3=true;
+            objdone = objdone + 1;
+        endif;
+    endif;
+    
+// Objective 4 - Assist Hammer Lance at Epsilon
+
+    if (not Obj4) then
+        if (GroupAllDead(GroupObjectID(31))) then
+            successobjective(eob_objective4);
+            obj4=true;
+            objdone = objdone + 1;
+        endif;
+    endif;
+    
+// Betty speaks when reaching Nav Point
+
+/*    if (not alphareached) then
+	    if (isnavrevealed(ena_nav_alpha)) then
+		    if (iswithin(playermech,ena_nav_alpha,checkrange)) then
+			    playvoiceover("VO\generic\navalpha",talker_Bet);
+			    alphareached = true;
+		    endif;
+	    endif;
+    endif; */
+
+    if (not betareached) then
+    	if (isnavrevealed(ena_nav_beta)) then
+    		if (iswithin(playermech,ena_nav_beta,checkrange)) then
+    			playvoiceover("VO\generic\navbeta",talker_Bet);
+    			betareached = true;
+            endif;
+    	endif;
+    endif;
+    
+    if (not gammareached) then
+    	if (isnavrevealed(ena_nav_gamma)) then
+    		if (iswithin(playermech,ena_nav_gamma,checkrange)) then
+    			playvoiceover("VO\generic\navgamma",talker_Bet);
+    			gammareached = true;
+                setnavpoint(ena_nav_beta);
+    		endif;
+    	endif;
+    endif;
+
+// Win the mission if the three primary objectives are completed
+
+    if (objdone==3) then
+        starttimer(3);
+        objdone = 0;    // So it won't go through this loop again
+    endif;
+    
+    if (timegreater(3,5)) then     // Delay after everyone is dead
+      
+      // Salvage Added by Ferret 7/28/01         
+        AddWeaponSalvage("LightGauss",2);
+        AddWeaponSalvage("SSRM6",4);            
+        AddWeaponSalvage("LRM20",1);
+        AddWeaponSalvage("AC5",1);
+        AddWeaponSalvage("AC10",1);
+        AddWeaponSalvage("UltraAC20",1);
+        AddWeaponSalvage("LBXAC10",1);
+        AddWeaponSalvage("LBXAC20",1);
+
+        AddMechInstanceSalvage("Thanatos");
+        AddMechInstanceSalvage("Mauler");
+      //
+        
+        trans won;
+    endif;
+
+// Fail the mission when the player dies
+	if (isdead(playermech)) then
+		KillVoiceOvers;
+		PlayVoiceOverOnce("VOX\Generic\EriDestroyed",talker_BAD);
+		StartMusic("Music\Defeat",3.0,3.5,70);
+		endmission(false,14);
+		cinema_cut = cinema_cut + 1;
+        trans lost;
+	endif;
+				
+endstate;
+
+state holdasecond;
+    code
+        
+        if (timegreater(1,1)) then
+       		SetCompositingEnabled(True);
+            CinemaEnd;
+            trans sit;
+        endif;
+    
+endstate;
+
+//-----------------------------------------
+//HERE THERE BE CINEMAS
+//-----------------------------------------
+
+state opening;
+	code
+
+    	if (cinemaskip) then
+        	KillVoiceOvers;
+    		cinema_cut = 0;
+    		KillTimer(gti_timer_21);
+    		SetGlobalTrigger(0,true);
+    		playerai(epl_player0,false);
+            StartTimer(1);      // This is the mission start timer
+            ResetTimer(1);
+            startgame = true;
+            startup(GroupObjectID(2));
+            
+    		trans holdasecond;  // I want the guys at ambush point to stay hidden, so startgame for a second
+        endif;
+
+     	switch (cinema_cut)
+    			
+            case 0:
+                SetActiveCamera(eca_CameraShip);
+
+                PlayVoiceOverOnce("VOX\OP5\MI2\Intro",talker_BAD);
+                PlayVoiceOverOnce("VOX\OP5\MI2\Intro",talker_CAI);
+                PlayVoiceOverOnce("VOX\OP5\MI2\Intro",talker_ERI);
+                PlayVoiceOverOnce("VOX\OP5\MI2\Intro2",talker_CAI);
+                PlayVoiceOverOnce("VOX\OP5\MI2\Intro2",talker_ERI);
+                PlayVoiceOverOnce("VOX\OP5\MI2\Intro2",talker_BAD);
+                PlayLancemateSound("VOX\OP5\MI2\Tough",1);
+                PlayVoiceOverOnce("VOX\OP5\MI2\Tough",talker_ERI);
+
+                playerai(epl_player0,true);
+                SetCompositingEnabled(False);
+                CinemaStart;
+                SetCameraFootShake(playermech,100);
+                shutdown(GroupObjectID(2));
+                
+                FadeToBlack(0.0);
+                starttimer(1);
+                resettimer(1);
+                
+                Targetfollowobject(playermech);
+                Camerafollowobject(ede_introcam);
+                Targetoffset(0.0,7.0,0.0,0.0,false);
+                //Targetoffset(0.0,10.0,1300.0,30.0,false);
+                Cameraoffset(0.0,50.0,0.0,0.0,false);
+                Cameraoffset(-210.0,-50.0,210.0,33.0,false);
+                FadeFromBlack(3.0);
+                
+                cinema_cut = cinema_cut + 1;
+            endcase;
+            
+            case 1:
+                if (timegreater(1,40)) then
+                    startgame = true;
+                endif;
+                
+                if (timegreater(1,41)) then
+                    KillVoiceOvers;
+                    cinema_cut = 0;
+                    KillTimer(gti_timer_21);
+                    SetGlobalTrigger(0,true);
+                    playerai(epl_player0,false);
+                    StartTimer(1);      // This is the mission start timer
+                    ResetTimer(1);
+                    CinemaEnd;
+                    SetCompositingEnabled(True);
+                    startup(GroupObjectID(2));
+                    
+                    trans sit;
+                endif;
+            endcase;
+
+            case 2:
+                                        
+            endcase;
+            
+            case 3:
+                
+            endcase;
+    			
+        endswitch;
+	
+endstate;
+
+state won;
+
+		code
+		
+		if (cinemaskip) then
+			cinema_cut = 20;
+			playerai(epl_player0,false);
+			cinemaend;
+			KillVoiceOvers;
+			Endmission(true,1);
+		endif;
+
+		
+		switch cinema_cut
+		
+			case 0:	
+                PlayVoiceOverOnce("VOX\OP5\MI2\Victory",talker_BAD);
+                PlayVoiceOverOnce("VOX\OP5\MI2\Victory",talker_ERI);
+                endmission(true,18);
+                
+                StartMusic("Music\Victory",3.0,3.5,50);
+                
+				SetCompositingEnabled(False);
+                CinemaStart;
+				Fadefromblack(0.0);
+				playerai(epl_player0,true);
+				ClearMoveOrder(playermech);
+				setactivecamera (eca_cameraship);
+				//Fadetoblack(7.0);
+				Targetfollowobject(playermech);
+				Camerafollowobject(playermech);
+				Targetoffset(0.0,7.0,0.0,0.0,false);
+				Cameraoffset(20.0,100.0,-90.0,0.0,false);
+				Cameraoffset(15.0,1.0,-15.0,6.0,false);
+				startTimer (gti_Timer_21);
+				resettimer (gti_Timer_21);
+				Cinema_Cut = Cinema_Cut+1;
+			endcase;
+			
+			
+			Case 1:
+				If TimeGreater(GTI_Timer_21,6) then
+				Cameraoffset(15.0,1.0,-15.0,0.0,false);
+				Cameraoffset(-15.0,1.0,-15.0,4.0,false);	
+				resettimer (gti_Timer_21);
+				Cinema_Cut = Cinema_Cut+1;
+				endif;
+			endcase;
+
+			Case 2:
+				If TimeGreater(GTI_Timer_21,4) then
+				Cameraoffset(-15.0,1.0,-15.0,0.0,false);
+				Cameraoffset(-15.0,1.0,15.0,4.0,false);	
+				resettimer (gti_Timer_21);
+				Cinema_Cut = Cinema_Cut+1;
+				endif;
+			endcase;
+
+			Case 3:
+				If TimeGreater(GTI_Timer_21,4) then
+				Cameraoffset(-15.0,1.0,15.0,0.0,false);
+				Cameraoffset(15.0,1.0,15.0,3.0,false);	
+				resettimer (gti_Timer_21);
+				Cinema_Cut = Cinema_Cut+1;
+				endif;
+			endcase;
+
+			
+			
+			Case 4:
+			endcase;			
+			
+		endswitch;
+	
+endstate;
+
+state lost;
+    code
+		
+		switch cinema_cut
+		
+			case 0:	
+			
+			endcase;
+			
+			case 1:
+			
+			endcase;
+			
+		endswitch;
+	
+endstate;
+
+
+endfsm.
+//******************************************************************
+

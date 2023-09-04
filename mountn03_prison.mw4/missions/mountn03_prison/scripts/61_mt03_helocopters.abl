@@ -1,0 +1,591 @@
+
+//*********************************************************************************
+//The below line MUST be changed in order for the script to be considered
+//a unique entity.  The word Patrol must be changed to some other unique identifier
+fsm Mt03_Helocopters : integer;
+
+//This unit patrols a specific path and attacks anything that comes near it.
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//
+//     Variable Declarations
+//
+//------------------------------------------------------------------
+	var
+	static integer			attackrange; 			// When do I start shooting?
+																
+	static integer			piloting; 				// piloting skill
+	static integer			gunnery; 					// hit chance,
+	static real				mindelay;					// minimum amount of time I will wait between shots once a weapon is reloaded
+	static real				maxdelay;					// maximum amount of time I will wait between shots once a weapon is reloaded
+	static integer 			speed;			 			// What speed so I move at?
+	static integer 			elitelevel; 			// % elite chance, This helps determine tactics, defensive manuevers, opportunity fire
+																				// and other things that would normally be determined by combat experience
+
+ 	static integer			isshotradius;			// how far away from me will I detect an enemy shot.
+	static integer			movetype;					// how will it move down the path?
+
+	static Boolean 			attacksoundplayed;
+	static integer 			attacksound; 			// plays when it first attacks
+	static integer 			deathsound; 			// plays when it dies
+	
+	static integer			mood;							// What is my normal mood?
+	
+	static Boolean			Resumed;					// Have I gotten to the end of the path?
+	static Boolean			reachedendofpath;				// Have I gotten to the end of the path?
+																							// Note: This only gets set if movetype is set to move_nocycle.
+	static integer			path;						 				// what path am I following?
+	static Boolean 			attackersdistractit;		// if FALSE, it won't leave the path, even when things
+																							// are shooting it. It will shoot back. Defaults to true
+																							// Once unit reaches the end of the path, It attacks freely.
+
+	static integer			Base;							// Where is my Base?  Am i too good for my HOME?
+	
+	static Boolean 			Secret;						// They are Powered down in Ambush
+	static Boolean 			Waiters;					// They are Powered down in Ambush
+	
+	static Boolean 			RescueSquad;					// They are Powered down in Ambush
+	
+	static integer			takeOffDistance;	// My take-off distance if I'm an airplane (ignored if not an airplane)
+	
+	static ObjectID 		MyLandNav;
+	static Boolean			HeloTimer;
+
+//------------------------------------------------------------------
+//
+//     Local Functions
+//
+//------------------------------------------------------------------
+
+function init;
+	code
+	
+	//These variables should not be changed by the designer without good reason
+		reachedendofpath 		= FALSE;						 			//false
+		attacksoundplayed 		= FALSE;									//false
+		attacksound 			= -1;
+		deathsound 				= -1;
+		Secret 					= FALSE;									//They are not in hiding
+		Waiters 				= FALSE;									//They will not get you a coke
+    RescueSquad 				= FALSE;									//
+    takeOffDistance				= 150;
+		HeloTimer				= False;
+	
+	//Use this to set different values for different units using the same brain	
+	switch (GetMemoryInteger(me,9))
+
+		case 1:															 //					Helo's
+		
+		attackrange         = 650;
+		piloting            = 50;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 50;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype            = move_circle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 				= epa_Path_Fly;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		takeOffDistance		= 100;
+		secret				= True;
+		
+		endcase;
+		
+		case 11:																 //				Rescue Chopper A
+				
+		attackrange         = 350;
+		piloting            = 50;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 600;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype            = move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_Rescue;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False; 		
+		RescueSquad 		= TRUE;
+		takeOffDistance		= 150;
+		MyLandNav			= ena_Nav_Alpha;
+		
+		endcase;
+		
+		case 12:																 //				Rescue Chopper B
+				
+		attackrange         = 350;
+		piloting            = 50;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 600;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype            = move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 				= epa_Path_Rescue;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		RescueSquad 		= TRUE;
+		takeOffDistance		= 150;
+		MyLandNav			= ena_Nav_Beta;
+		
+		endcase;
+		
+		case 13:					// Rescue Chopper G
+		
+		attackrange         = 350;
+		piloting            = 50;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 600;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype            = move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 				= epa_Path_Rescue;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		RescueSquad 		= TRUE;
+		takeOffDistance		= 150;
+		MyLandNav			= ena_Nav_Gamma;
+		
+		endcase;
+		
+		case 14:					 //	Rescue Chopper D
+		
+		attackrange         = 350;
+		piloting            = 50;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 600;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype            = move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 				= epa_Path_Rescue;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		RescueSquad 		= TRUE;
+		takeOffDistance		= 150;
+		MyLandNav			= ena_Nav_Delta;
+		
+		endcase;
+	
+	endswitch;
+
+endfunction;
+
+//------------------------------------------------------------------
+//
+//     Main Code
+//
+//------------------------------------------------------------------
+state startState;
+
+	code
+		
+		SetFiringDelay						(me,mindelay,maxdelay);
+		setignorefriendlyfire			(me,true);
+		setisshotradius						(me,isshotradius);
+		setentropymood						(me,mood);
+		setcurmood								(me,mood);
+		setskilllevel							(me,piloting,gunnery,elitelevel);
+		//setsearchlight					(me,on);
+		//startexecute						(me);
+		//setalignment						(me,enemy);
+		
+		
+		If (RescueSquad == TRUE) then
+			trans WaitState;
+		endif;
+		
+		if (orderTakeOff(takeOffDistance) == true) then	
+			if (secret == true) then
+				shutdown(me);
+				trans hangout;
+			else
+				trans patrol;
+			endif;
+		endif;
+
+endstate;
+
+state WaitState;
+	code
+		
+	shutdown(me);
+
+		if (RescueTime == true) then
+		
+			switch (GetMemoryInteger(me,9))
+				
+				
+				case 11:															 		//				Rescue Chopper a
+					trans PowerUp;
+				endcase;
+				
+				case 12:															 		//				Rescue Chopper b
+					trans PowerUp;
+				endcase;
+				
+				case 13:															 		//				Rescue Chopper c
+					trans PowerUp;
+				endcase;
+
+        case 14:															 		//				Rescue Chopper D
+					if (SendInD == true) then
+            trans PowerUp;
+          endif;		
+        endcase;
+	
+			endswitch;
+
+		endif;
+
+endstate;
+
+
+state PowerUp;
+	code
+	
+				startup(me);
+				clearmoveorder(me);
+				PlayVoiceOverOnce("Vox\op3\mi3\RescueChoppers1", talker_bet);  // Rescue choppers take off and announce inbound.
+        trans PowerUp2;
+
+endstate;
+
+state PowerUp2;
+	code
+			
+		if (orderTakeOff(150) == true) then
+			if OrderMoveto(path,speed,movetype,true,false) then
+
+				switch (GetMemoryInteger(me,9))
+		
+					case 11:																 //				Rescue Chopper A
+						AlphaBreak = true;
+					endcase;
+		
+					case 12:																 //				Rescue Chopper B
+						BetaBreak  = true;
+					endcase;
+		
+					case 13:															 		//				Rescue Chopper G
+						GammaBreak = true;
+					endcase;
+		
+					case 14:															 		//				Rescue Chopper D
+						DeltaBreak = true;
+					endcase;
+	
+				endswitch;
+				
+				clearmoveorder(me);
+        trans PowerUp3;
+				
+			endif;
+		endif;
+			
+endstate;
+
+state PowerUp3;
+	code
+			
+		if OrderMoveToObject(MyLandNav,200) == true then
+			trans PowerUp4;
+		endif;
+			
+endstate;
+
+state PowerUp4;
+	code
+		
+		If (orderland == true) then
+		    // PlayVoiceOverOnce("VO\OP2\MI1\TouchingDown", TALKER_Fo1);	// This voice over wasn't working, so added a new one. - davelueh
+			PlayVoiceOverOnce("Vox\op3\mi3\RescueChoppers2", talker_bet);
+            trans landwait;
+		endif;
+		
+endstate;
+
+state LandWait;
+	code
+	
+			ResetTimer(11);								//Rescue Timer
+			starttimer(gti_timer_11);
+			clearmoveorder(me);
+			SetNavPoint(ena_Nav_Delta);
+			RevealObjective(eob_Objective4);
+			if (not HeloTimer) then
+				resettimer(gti_timer_18);
+				starttimer(gti_timer_18);
+				HeloTimer = true;
+			endif;
+			
+			// play notification of prisoners at Delta 5 seconds after landing
+			if (timegreater(gti_timer_18, 5)) then
+				PlayVoiceOverOnce("vox\op3\mi3\gamma", TALKER_HOW);	  // This audio line is a little off (should say delta), well the whole mission seems to have changed a bit so I left it in, for fifield to make a call on - davelueh
+				PlayVoiceOverOnce("vox\op3\mi3\esit", TALKER_BAD);
+				Trans RescueWait;
+			endif; 
+			
+			
+			SendInD = true;
+      //trans RescueWait;
+
+endstate;
+
+state RescueWait;
+	code
+
+		if (TimeGreater(gti_Timer_11,20)) then
+			clearmoveorder(me);
+			trans RescueReturn;
+		endif;
+
+endstate;
+
+state RescueReturn;
+	code
+	
+		if (orderTakeOff(150) == true) then
+			trans RescueReturn2;
+		endif;
+									
+endstate;
+
+state RescueReturn2;
+	code
+		
+		// davelueh play 3rd chopper audio here..
+	PlayVoiceOverOnce("Vox\op3\mi3\RescueChoppers3", talker_bet);
+
+	switch (GetMemoryInteger(me,9))
+		
+		case 11:																 //				Rescue Chopper A
+			if OrderMoveToObject(ena_navRescueA,200) == true then
+				trans RescueReturn3;
+			endif;
+		endcase;
+		
+		case 12:																 //				Rescue Chopper B
+			if OrderMoveToObject(ena_navRescueB,200) == true then
+				trans RescueReturn3;
+			endif;
+		endcase;
+		
+		case 13:															 		//				Rescue Chopper G
+			if OrderMoveToObject(ena_navRescueG,200) == true then
+				trans RescueReturn3;
+			endif;
+		endcase;
+		
+		case 14:															 		//				Rescue Chopper D
+            // PlayVoiceOverOnce("vox\op3\mi3\clear", TALKER_HOW);		 // I removed this file as we use it now at the end of the mission.
+            if OrderMoveToObject(ena_navRescueD,200) == true then
+				trans RescueReturn3;
+			endif;
+		endcase;
+	
+	endswitch;
+			
+endstate;
+
+state RescueReturn3;
+	code
+        If (orderland == true) then
+		// PlayVoiceOverOnce("VO\OP2\MI1\TouchingDown", TALKER_Fo1);  this wasn't working in xpack build.
+			PlayVoiceOverOnce("vox\op3\mi3\clear", TALKER_HOW);			//  this isn't really good audio, we should trim this file.  (now schedule, so I left it in).
+            trans MissionDone;
+		endif;
+		
+endstate;
+
+state MissionDone;
+	code
+		
+	switch (GetMemoryInteger(me,9))
+		
+		case 11:																 //				Rescue Chopper A
+			Rescue1			= TRUE;				
+		shutdown(me);
+		endcase;
+		
+		case 12:																 //				Rescue Chopper B
+			Rescue2			= TRUE;				
+		shutdown(me);
+		endcase;
+		
+		case 13:															 		//				Rescue Chopper G
+			Rescue3			= TRUE;				
+		shutdown(me);
+		endcase;
+		
+		case 14:															 		//				Rescue Chopper D
+			Rescue4			= TRUE;				
+		shutdown(me);
+		endcase;
+	
+	endswitch;
+		
+endstate;
+
+state deadState;
+  code
+		
+		orderDie;
+endstate;
+
+state Hangout;
+  code
+
+				If ((isShot (me)))	then
+					startup(me);
+					trans patrol;
+				endif;
+				
+				if ((iswithin(me,(groupobjectid(1)),300)) == true) then
+					startup(me);
+					trans patrol;
+				endif;
+				
+				if (SendinD == true) then
+					startup(me);
+					trans patrol;  
+				endif;
+				
+			      
+//				If (Engaged == true) then
+//					startup (me);
+//					trans patrol;
+//				endif;
+
+endstate;
+
+state RunAwaySTATE;
+		
+  code
+		
+			SetTargetDesirability(playermech,-1);
+			SetTargetDesirability(GroupObjectId(2),-1);
+			
+	        ordermovetoobject(ena_Nav_Epsilon,600);
+						
+endstate;
+	
+	state patrol;
+
+  var
+
+		ObjectID foe;
+
+		code
+
+		If (AlphaBreak == true) or (BetaBreak == true) or (GammaBreak == true) or (DeltaBreak == true) then			
+			path = -1;
+		endif;
+	
+	//Head down the path.  If this has already been done
+	//or if there is no path set then look around
+	
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+					if ((orderMoveto(path,speed,movetype,true,true)) == TRUE) then
+						reachedendofpath = TRUE;
+					endif; 			
+			else	 		 		
+				OrderMoveToObject((playermech),200);			
+			endif;
+			
+		//Find me a target
+			if (setmytarget(attackrange)) then
+				trans attack;
+			endif;
+			
+	endstate;
+
+//------------------------------------------------------------------
+//
+//     attack state : description
+//
+//------------------------------------------------------------------
+	state attack;
+		
+		code
+			
+		if (LeaveAttackState(attackrange*3/2)) then
+			orderstopattacking;
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,attackersdistractit);
+			endif;
+				trans patrol;
+		endif;
+		
+		If RunAway == True then
+			if RescueSquad == FALSE then
+				setTarget(me,no_unit);
+				ordermovetoobject(ena_Nav_Epsilon,600);
+				trans RunAwaySTATE;
+			endif; 			
+		endif; 			
+		
+		//the ever popular attack order
+    orderAttack (attackersdistractit);
+		
+		//if the ridge tanks are in a fight, then the ambush is set
+		If (Waiters == true) then
+//				Engaged = True;
+				Waiters = False;
+		endif;
+		
+		//play the attack sound if one exists
+		if ((attacksound <> -1) and (attacksoundplayed == FALSE)) then	
+			attacksoundplayed = true;
+			PlaySoundOnce(attacksound);
+		endif;	
+		
+		//maybe swap targets when I am shot
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 			
+					
+	endstate;
+
+
+endfsm.
+//******************************************************************
+

@@ -1,0 +1,217 @@
+
+//------------------------------------------------------------------
+// NOTE: The fsm name below MUST be changed in order for the
+// script to be considered a unique entity!
+
+fsm Mn04_Turret : integer;
+
+
+//------------------------------------------------------------------
+
+// Generic_Turret:
+//   This shoots anything that comes near, but never moves.
+//   It can be used for turrets.
+
+//------------------------------------------------------------------
+
+
+
+//------------------------------------------------------------------
+//     Constants
+//------------------------------------------------------------------
+
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//     Types
+//------------------------------------------------------------------
+
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//     Variables
+//------------------------------------------------------------------
+
+	var
+		static integer			attackRange;		// At what range do I start shooting?
+		static integer			withdrawRange;	// At what range do I stop attacking?
+
+		static ObjectID			MyTower;				// My control tower: if destroyed, I stop firing
+													
+		
+		static integer			piloting; 			// piloting skill
+		static integer			gunnery;				// Gunnery skill/chance to hit
+		static real					minDelay;				// Minimum amount of time I will wait between shots once a weapon is reloaded
+		static real					maxDelay;				// Maximum amount of time I will wait between shots once a weapon is reloaded
+		static integer 			eliteLevel;			// Elite level.  This helps determine tactics, defensive manuevers, opportunity fire
+																				// and other things.  It indicates a general level of combat experience.
+
+ 		static integer			isShotRadius;		// How far away from me will I detect an enemy shot?
+		static integer			findTypes;			// What kind of enemies to look for
+
+		static integer			mood;						// My default mood.
+
+//------------------------------------------------------------------
+//     Init: my initialization function
+//------------------------------------------------------------------
+
+function Init;
+	code
+		// script-specific variables
+		attackRange				= 500;
+		withdrawRange			= attackRange * 3 / 2;
+
+		MyTower						= NO_UNIT;
+
+		// driver settings
+		
+		piloting					= 30; 				// piloting skill
+		gunnery						= 30;
+		minDelay					= 0.25;
+		maxDelay					= 0.75;
+		eliteLevel				= 30;
+		isShotRadius			= 120;
+		mood							= NEUTRAL_START;
+		findTypes					= FT_DEFAULT;
+
+	//Use this to set different values for different units using the same brain
+	switch (GetMemoryInteger(me,9))
+			
+		case 41:						//South
+		
+		attackrange 			= 650;	
+		gunnery 					= 40;									//changed 8/19 see bug 2021	
+		mindelay 					= 0.0;			
+		maxdelay 					= 0.5;
+		elitelevel 				= 30;
+		MyTower 					= eve_South_turret_tower;				
+    isshotradius 			= 40;				
+		
+		endcase;
+		
+		case 43:						//Front
+		
+		attackrange 			= 650;	
+		gunnery 					= 50;									//changed 8/19 see bug 2021	
+		mindelay 					= 0.0;			
+		maxdelay 					= 0.5;
+		elitelevel 				= 80;
+		MyTower 					= eve_Front_turret_tower;				
+    isshotradius 			= 40;				
+		
+		endcase;
+		
+		case 45:						//North
+		
+		attackrange 			= 950;	
+		gunnery 					= 50;									//changed 8/19 see bug 2021 	
+		mindelay 					= 0.0;			
+		maxdelay 					= 0.5;
+		elitelevel 				= 80;
+		MyTower 					= eve_North_turret_tower;				
+    isshotradius 			= 40;				
+		
+		endcase;
+		
+	endswitch;
+
+endfunction;
+
+//------------------------------------------------------------------
+//	StartState: my initial state
+//------------------------------------------------------------------
+
+state StartState;
+
+	code
+		SetFiringDelay					(ME,minDelay,maxDelay);
+		SetIgnoreFriendlyFire		(ME,true);
+		SetIsShotRadius					(ME,isshotradius);
+		SetEntropyMood					(ME,mood);
+		SetCurMood							(ME,mood);
+		SetSkillLevel						(ME,piloting,gunnery,elitelevel);
+		
+		trans waitstate; 	
+endstate;			
+
+//------------------------------------------------------------------
+//	WaitState: wait for someone to come near
+//------------------------------------------------------------------
+
+state WaitState;
+	code
+		if (FindEnemy(attackRange,findTypes)) then
+			trans AttackState;
+		endif;
+
+		if (MyTower <> NO_UNIT) then
+			if (IsDead(MyTower) == true) then
+				trans TowerGoneState;
+			endif;
+		endif;
+
+		if (Missionwon == true) then
+				trans TowerGoneState;
+		endif;
+
+		SetSensorVisibility(ME,FALSE);
+		OrderMoveLookOut;
+endstate;
+
+//------------------------------------------------------------------
+//	AttackState: let's see what's around, and destroy it
+//------------------------------------------------------------------
+
+state AttackState;
+	code
+		if (LeaveAttackState(withdrawRange)) then
+			OrderStopAttacking;
+			SetTarget(ME,NO_UNIT);
+			trans WaitState;
+		endif;
+
+		if (MyTower <> NO_UNIT) then
+			if (IsDead(MyTower) == true) then
+				trans TowerGoneState;
+			endif;
+		endif;
+
+		if (Missionwon == true) then
+				trans TowerGoneState;
+		endif;
+		
+		SetSensorVisibility(ME,TRUE);
+		OrderAttackTactic(TACTIC_SHOOT_ONLY,true);
+
+endstate;
+
+//------------------------------------------------------------------
+//	TowerGoneState: my control tower is destroyed; I can do nothing
+//------------------------------------------------------------------
+
+state TowerGoneState;
+	code
+		SetTarget(ME,NO_UNIT);
+		OrderStopAttacking;
+		ClearMoveOrder(ME);
+		SetTargetDesirability(ME,-1);
+		SetSensorVisibility(ME,FALSE);
+endstate;
+
+//------------------------------------------------------------------
+//	DeadState: OK, I kicked the bucket.
+//------------------------------------------------------------------
+
+state DeadState;
+	code
+
+		orderDie;
+
+endstate;
+
+
+endfsm.
+

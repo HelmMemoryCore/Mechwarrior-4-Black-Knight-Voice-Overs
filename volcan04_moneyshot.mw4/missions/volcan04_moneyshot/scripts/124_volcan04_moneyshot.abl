@@ -1,0 +1,1447 @@
+
+//*********************************************************************************
+
+fsm  Volcan04_MoneyShot : integer;
+
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+     const
+
+		#include_ <content\ABLScripts\mwconst.abi>
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+     type
+
+		#include_ <content\ABLScripts\mwtype.abi>
+
+//------------------------------------------------------------------
+//    DestroyCommArray=0
+//    Variable Declarations
+//
+//------------------------------------------------------------------
+      var
+		eternal ObjectID playermech;
+		eternal ObjectID HQ;
+
+		static  ObjectID lancemate1;
+		static  ObjectID lancemate2;
+		static  ObjectID lancemate3;
+
+		eternal boolean Objective1Win;						//Primary: Destroy enemy threat around Nav Alpha
+		eternal boolean Objective2Win;						//Primary: Destroy enemy threat around Nav Beta
+		eternal boolean Objective3Win;						//Primary: Destroy enemy threat around Nav Gamma
+		static  boolean Objective4Win;						//Primary: Destroy Steiner Headquarters Building at Nav Gamma
+		static  boolean Objective5Win;						//Primary: Destroy Major Dupree's Escape Pod
+        static  boolean Objective6Win;						//FAB Primary: Kill Dupree
+		
+		static  boolean RevealObj4;								//Primary:
+		static  boolean RevealObj5;								//Primary:
+		
+		static  boolean ShotHQ;										//Primary:
+		
+		eternal boolean CrackTime;								//Set to true when
+		eternal boolean RunnerTime;								//Set to true when
+		eternal boolean TankTime;									//Set to true when
+		eternal boolean TurretTime;									//Set to true when
+		eternal boolean BetaSpoke;									//Set to true when
+		eternal boolean BombTime;									//Set to true when
+		eternal boolean CityTime;									//Set to true when
+		eternal boolean CalliopeTime;							//Set to true when
+		eternal boolean VolcanoTime;							//Set to true when half of Group80 isdead
+		eternal boolean EscapeTime;								//Set to true when HQ is very damaged
+		
+		
+		static integer	HQArmor;
+		
+		eternal boolean	Damaged;                 	//Has the HQ reached it damaged spot?
+		eternal boolean	MidCinStart;
+		eternal boolean MidCinStop;
+		
+		static integer	BetaTime;									//when did the Convoy Reach Beta
+		static integer	GammaTime;								//when did the Convoy Reach Gamma
+										
+		static  boolean EncounterSpoke;						//Encounter  Lancemate sound played
+		static  boolean ChaseSpoke;								//Chase Mech Encounter  Lancemate sound played
+		static  boolean IntroSpoke;								//Intro  Lancemate sound played
+
+		static  boolean OpenSpoke;								//Used for VO timing in opening cinema
+
+		eternal boolean	engaged;
+		eternal boolean	PlayerEnd;
+
+		eternal boolean	missionwon;
+
+		eternal boolean	BoomTanks;								//Time to blow up the tanks
+
+		static integer	teleportLanceNav;         //Moves Lancemate to Position near base
+		eternal boolean	TeleportStart;						//Moves Player to Position near base
+
+		static locpoint	PlayerPoint;
+		static locpoint	MatePoint;
+		static locpoint	DropPoint;
+
+		static integer	teleportPNav;
+		static integer	teleportMNav;
+		static integer	teleportDNav;
+
+		static integer	cinema_cut;
+        
+        eternal integer     LanceNum;           // FAB Number of Lancemates brought
+        eternal integer     LanceAlive;         // FAB Number of Lancemates still alive
+        static locpoint     mynav;              // FAB Used to teleport people around
+        eternal boolean     StandStill;         // FAB This is so the playermech will stand still when needed in movies
+        static integer      HP1;                // FAB HP for lancemate 1
+        static integer      HP2;                // FAB HP for lancemate 2
+        static integer      HP3;                // FAB HP for lancemate 3
+        static integer      DupreeKill;         // Dupree has killed X number of your lancemates
+        eternal boolean     EscapePrelim;       // Put the pod on the roof for the end movie
+        eternal boolean     AllAlone;           // The PC has no lancemates when they encounter Dupree
+        static boolean      MoviePlayed;        // The Dupree intro movie has played
+
+//------------------------------------------------------------------
+//
+//     Init Function    (automatically run first time through)
+//
+//------------------------------------------------------------------
+
+function init;
+	var
+		integer i;
+
+	code
+      //INTRODUCING ALL THE PLAYERS
+			playermech = getplayervehicle(epl_player0);
+			GroupAddObject(GroupObjectId(1),playermech);
+        
+        // FAB Lancemates added to a group
+        LanceNum = 0;
+        
+        if (GetLancemate(1)<>NO_UNIT) then
+            GroupAddObject(GroupObjectId(2),GetLancemate(1));
+            LanceNum = 1;
+        endif;
+
+        if (GetLancemate(2)<>NO_UNIT) then
+            GroupAddObject(GroupObjectId(2),GetLancemate(2));
+            LanceNum = LanceNum + 1;
+        endif;
+
+        if (GetLancemate(3)<>NO_UNIT) then
+            GroupAddObject(GroupObjectId(2),GetLancemate(3));
+            LanceNum = LanceNum + 1;
+        endif;
+			
+			HQ				 = ebu_Obj_SteinerHQ;
+
+// Helicopter Patrol																				Mem Cell 10
+GroupAddObject(GroupObjectId(10),eve_CrackCopt1);
+GroupAddObject(GroupObjectId(10),eve_CrackCopt2);
+GroupAddObject(GroupObjectId(10),eve_CrackCopt3);
+GroupAddObject(GroupObjectId(10),eve_CrackCopt4);
+
+// Helicopter Patrol																				Mem Cell 10
+GroupAddObject(GroupObjectId(11),eve_CrackCopt1);
+GroupAddObject(GroupObjectId(11),eve_CrackCopt2);
+GroupAddObject(GroupObjectId(11),eve_CrackCopt3);
+GroupAddObject(GroupObjectId(11),eve_CrackCopt4);
+// Tank Patrol								 														Mem Cell 12
+GroupAddObject(GroupObjectId(11),eve_CrackTank1);
+GroupAddObject(GroupObjectId(11),eve_CrackTank2);
+GroupAddObject(GroupObjectId(11),eve_CrackTank3);
+GroupAddObject(GroupObjectId(11),eve_CrackTank4);
+
+// Tank Patrol																							Mem Cell 12
+GroupAddObject(GroupObjectId(12),eve_CrackTank1);
+GroupAddObject(GroupObjectId(12),eve_CrackTank2);
+GroupAddObject(GroupObjectId(12),eve_CrackTank3);
+GroupAddObject(GroupObjectId(12),eve_CrackTank4);
+
+// Mechs waiting in Ambush																	Mem Cell 13
+GroupAddObject(GroupObjectId(13),eve_CrackAmbush1);
+GroupAddObject(GroupObjectId(13),eve_CrackAmbush2);
+GroupAddObject(GroupObjectId(13),eve_CrackAmbush3);
+GroupAddObject(GroupObjectId(13),eve_CrackAmbush4);
+
+// Mechs on Patrol until they snipe from Rear								Mem Cell 15
+GroupAddObject(GroupObjectId(15),eve_RunnerRear1);
+GroupAddObject(GroupObjectId(15),eve_RunnerRear2);
+
+/*
+// Path changes to RunnerRun when isdead grp20							Mem Cell 22
+GroupAddObject(GroupObjectId(18),eve_BombRun1);
+GroupAddObject(GroupObjectId(18),eve_BombRun2);
+GroupAddObject(GroupObjectId(18),eve_BombRun3);
+GroupAddObject(GroupObjectId(18),eve_BombRun4);
+GroupAddObject(GroupObjectId(18),eve_BombRun5);
+GroupAddObject(GroupObjectId(18),eve_BombRun6);
+GroupAddObject(GroupObjectId(18),eve_BombRun7);
+*/
+
+// Air units attack as player approaches base								Mem Cell 20
+GroupAddObject(GroupObjectId(20),eve_PopCopt1);
+GroupAddObject(GroupObjectId(20),eve_PopCopt2);
+GroupAddObject(GroupObjectId(20),eve_PopCopt3);
+GroupAddObject(GroupObjectId(20),eve_PopCopt4);
+
+// Tanks power up & attack = player reaches Beta/Gamma			Mem Cell 22
+GroupAddObject(GroupObjectId(22),eve_TankAmbush1);
+GroupAddObject(GroupObjectId(22),eve_TankAmbush2);
+GroupAddObject(GroupObjectId(22),eve_TankAmbush3);
+GroupAddObject(GroupObjectId(22),eve_TankAmbush4);
+GroupAddObject(GroupObjectId(22),eve_TankAmbush5);
+GroupAddObject(GroupObjectId(22),eve_TankAmbush6);
+GroupAddObject(GroupObjectId(22),eve_TankAmbush7);
+GroupAddObject(GroupObjectId(22),eve_TankAmbush8);
+
+// These Mechs Stay in the base for defense									Mem Cell 31
+GroupAddObject(GroupObjectId(31),eve_CityDwell1);
+GroupAddObject(GroupObjectId(31),eve_CityDwell2);
+GroupAddObject(GroupObjectId(31),eve_CityDwell3);
+
+// Mechs on Patrol return to the fray												Mem Cell 33
+GroupAddObject(GroupObjectId(33),eve_Orbital1);
+GroupAddObject(GroupObjectId(33),eve_Orbital2);
+GroupAddObject(GroupObjectId(33),eve_Orbital3);
+
+//Enemy Mech That Jump attacks gaurding calliope tower
+//GroupAddObject(GroupObjectId(35),eve_CalliopePerch);					//Mem 35    removed 9-6
+
+// Startup and attack when four defenders are dead					Mem Cell 36
+GroupAddObject(GroupObjectId(37),eve_Volcano1);
+GroupAddObject(GroupObjectId(37),eve_Volcano2);
+GroupAddObject(GroupObjectId(37),eve_Volcano3);
+GroupAddObject(GroupObjectId(37),eve_Volcano4);
+
+GroupAddObject(GroupObjectId(80),eve_CityDwell1);
+GroupAddObject(GroupObjectId(80),eve_CityDwell2);
+GroupAddObject(GroupObjectId(80),eve_CityDwell3);
+
+// Mechs on Patrol return to the fray												Mem Cell 33
+GroupAddObject(GroupObjectId(80),eve_Orbital1);
+GroupAddObject(GroupObjectId(80),eve_Orbital2);
+GroupAddObject(GroupObjectId(80),eve_Orbital3);
+
+// Beta Mechs FAB
+GroupAddObject(GroupObjectId(81),eve_Orbital1);
+GroupAddObject(GroupObjectId(81),eve_Orbital2);
+GroupAddObject(GroupObjectId(81),eve_Orbital3);
+
+//
+GroupAddObject(GroupObjectId(41),etu_base_turret1);
+GroupAddObject(GroupObjectId(41),etu_base_turret2);
+GroupAddObject(GroupObjectId(41),etu_base_turret3);
+GroupAddObject(GroupObjectId(41),etu_base_turret4);
+GroupAddObject(GroupObjectId(41),etu_base_turret5);
+GroupAddObject(GroupObjectId(41),etu_base_turret6);
+GroupAddObject(GroupObjectId(41),etu_base_turret7);
+GroupAddObject(GroupObjectId(41),etu_base_turret8);
+
+//
+GroupAddObject(GroupObjectId(45),etu_calliope1);
+GroupAddObject(GroupObjectId(45),etu_calliope2);
+GroupAddObject(GroupObjectId(45),etu_calliope3);
+GroupAddObject(GroupObjectId(45),etu_calliope4);
+
+SetGroupAI(groupobjectid(10),GROUPAI_MOODSQUAD);
+SetGroupAI(groupobjectid(12),GROUPAI_MOODSQUAD);
+SetGroupAI(groupobjectid(13),GROUPAI_MOODSQUAD);
+SetGroupAI(groupobjectid(15),GROUPAI_MOODSQUAD);
+//SetGroupAI(groupobjectid(18),GROUPAI_MOODSQUAD);
+SetGroupAI(groupobjectid(20),GROUPAI_MOODSQUAD);
+SetGroupAI(groupobjectid(22),GROUPAI_MOODSQUAD);
+SetGroupAI(groupobjectid(31),GROUPAI_MOODSQUAD);
+SetGroupAI(groupobjectid(33),GROUPAI_MOODSQUAD);
+//SetGroupAI(groupobjectid(35),GROUPAI_MOODSQUAD);
+SetGroupAI(groupobjectid(37),GROUPAI_MOODSQUAD);
+
+SetGroupAI(groupobjectid(41),GROUPAI_MOODSQUAD);
+SetGroupAI(groupobjectid(45),GROUPAI_MOODSQUAD);
+
+//			BaseEncounter = false;
+
+			engaged 			= false;
+			PlayerEnd 		= false;
+
+			cinema_cut 		= 0;
+			missionwon 		= false;
+
+			Objective1Win = false;
+			Objective2Win = false;
+			Objective3Win = false;
+			Objective4Win = false;
+			Objective5Win = false;
+			
+			RevealObj4    = false;
+			RevealObj5    = false;
+			
+			ShotHQ		    = false;
+			
+			CrackTime       = false;
+			RunnerTime    	= false;
+			TankTime		= false;
+			TurretTime      = false;
+			BetaSpoke       = false;
+			BombTime	    = false;
+			CityTime	    = false;
+			CalliopeTime		= false;
+			VolcanoTime			= false;
+			EscapeTime			= false;
+			
+			Damaged				= false;
+			
+			MidCinStart   = false;
+			MidCinStop    = false;
+
+			HQArmor 		= getHP(HQ);
+			
+			BetaTime					=	0;
+			GammaTime					=	0;
+			
+			EncounterSpoke	= false;
+			ChaseSpoke      = false;
+			IntroSpoke      = false;
+
+			OpenSpoke       = false;
+			BoomTanks       = false;
+
+			//teleportPNav 		= ena_NavPointPlay;
+			//teleportMNav		= ena_NavPointMate;
+			//teleportDNav		= ena_Mountain;
+
+endfunction;
+
+function MoveSomething;
+
+	var
+		LocPoint Lance_nav;
+
+  code
+
+		//TeleportStart = TRUE;							DO NOT USE THIS STUFF FOR OTHER MISSIONS
+
+		If (GetLancemate(1) <> NO_UNIT) then
+			//GetLocation(teleportLanceNav,Lance_nav);
+			//Teleport(GetLancemate(1),Lance_nav);
+		endif;
+
+endfunction;
+
+//------------------------------------------------------------------
+//
+//     Main Code
+//
+//------------------------------------------------------------------
+state startState;
+
+	code
+		//setactivationdistance(6800);
+		StartMusic("Music\Panarama",0.0,3.0,50);
+
+		playerai(epl_player0,true);
+		
+		ResetTimer(21);								//Cinema Timer
+		starttimer(gti_timer_21);
+
+		ResetTimer(10);								//Mission Timer
+		starttimer(gti_timer_10);
+
+		//Reveal the objectives
+			SetNavPoint(ena_Nav_Alpha);
+			SetNavPoint(ena_Nav_Beta);
+			SetNavPoint(ena_Nav_Gamma);
+			SetNavPoint(ena_Nav_Alpha);
+
+			//shutdown(groupObjectID(99));
+
+			SetSensorVisibility(GroupObjectID(50),false);
+			SetCompositingEnabled(False);
+			CinemaStart;
+
+			trans opening;
+
+endstate;
+
+state deadState;
+
+	code
+
+endstate;
+
+//------------------------------------------------------------------
+//
+//     Sit state : description
+//
+//------------------------------------------------------------------
+state sit;
+
+	code
+
+	SetSensorVisibility(GroupObjectID(69),True);
+	SetSensorVisibility(GroupObjectID(50),True);
+
+	SetCompositingEnabled(True);
+
+	SetAudioFXEnabled(true);
+
+	If (IsMusicPlaying == false) then
+		StartMusic("Music\ArcticAmbloop",0.25,3.0,30)
+	endif;
+
+// VO Queues for FAB
+
+    if (not GetGlobalTrigger(6)) then   //Get close to the tanks and Radcliff makes a comment
+        if (iswithin(playermech,GroupObjectID(12),350)) then
+    		PlayLanceMateSound("vox\op5\mi4\murderous",1);				
+            SetGlobalTrigger(6,true);
+        else
+            if (GroupAllDead(GroupObjectID(12))) then
+                SetGlobalTrigger(6,true);
+            endif;
+        endif;
+    endif;
+   
+//Fail the mission when the player dies
+	if (isdead(playermech)) then
+		failobjectiveall(20);
+		trans lostdead;
+	endif;
+
+
+//*******************************************
+// Seting Global Variables
+//*******************************************
+
+		If CrackTime == False then
+			If (GroupNumDead(GroupObjectId(11)) > 3) then
+				CrackTime = TRUE;
+			endif;
+		endif;
+		
+		If RunnerTime == False then
+			If (GroupNumDead(GroupObjectId(13)) > 0) then
+				RunnerTime = TRUE;
+			endif;
+		endif;
+
+		If TankTime == False then
+			If (GroupNumDead(GroupObjectId(13)) > 0) or (Objective2Win == TRUE)	then
+				TankTime = TRUE;
+			endif;
+		endif;
+		
+		If TurretTime == False then
+		    If ((iswithin(playermech,ena_Nav_Gamma,600)) == true) then
+				PlayVoiceOverOnce("vox\op5\mi4\Reinforce", TALKER_BAD);
+				TurretTime = TRUE;
+			endif;
+		endif;
+		
+		/* If BetaSpoke == False then
+		    If ((iswithin(playermech,ena_Nav_Beta,900)) == true) then
+				PlayVoiceOverOnce("vox\op5\mi4\Beta", TALKER_ERI);
+				BetaSpoke = TRUE;
+			endif;
+		endif; */
+        
+        if (not BetaSpoke) then
+            if (isdead(GroupObjectID(81))) then
+                PlayVoiceOverOnce("vox\op5\mi4\BetaAlt", TALKER_ERI);
+                BetaSpoke = TRUE;
+            endif;
+        endif;
+		
+		If BombTime == False then
+			If (GroupNumDead(GroupObjectId(20)) > 2) then
+				BombTime = TRUE;
+			endif;
+		endif;
+		
+		If CityTime == False then
+			If (Objective2Win == TRUE) then
+				CityTime = TRUE;
+			endif;
+		endif;
+		
+		If VolcanoTime == False then
+			If (GroupNumDead(GroupObjectId(80)) > 2) then
+				VolcanoTime = TRUE;
+			endif;
+		endif;
+		
+		/* If RevealObj4 == False then
+			If (Objective3Win == TRUE) then
+					PlayVoiceOverOnce("vox\op5\mi4\Base", TALKER_BAD);
+				revealobjective(eob_objective4);
+				RevealObj4 = TRUE;
+					ResetTimer(4);								//Function Timer
+					starttimer(gti_timer_4);
+			endif;
+		endif;
+		
+		if ShotHQ == TRUE then	
+			If (Objective4Win == FALSE) then
+				if (TimeGreater(gti_Timer_4,45)) then
+					successobjective(eob_objective4);
+					Objective4Win = true;
+					trans MiddleTriggers;
+				endif;
+			endif;
+		endif;
+		
+		if ShotHQ == false then	
+			if (TimeGreater(gti_Timer_4,20)) then
+				if isshot(HQ) then
+					ShotHQ = True;
+				endif;
+			endif;
+		endif; */
+		
+		If RevealObj5 == False then
+			If (Objective4Win == TRUE) then
+				if not isdead(eve_Escape_Pod) then
+					SetGUITarget(GetPlayerVehicle(epl_player0),eve_Escape_Pod);
+					revealobjective(eob_objective5);
+					RevealObj5 = TRUE;
+				endif;
+			endif;
+		endif;
+        
+        if (EscapeTime == TRUE) and (TimeGreater(gti_Timer_6,25)) then
+			trans LostDead;
+        endif;
+        
+        if (not GetGlobalTrigger(3)) then       // FAB When you get near gamma then your lancemates make a comment
+            if (Objective2Win) then
+                if (iswithin(playermech,ena_nav_gamma,650)) then
+                    PlayLanceMateSound("vox\op5\mi4\elite",1);
+                    SetGlobalTrigger(3,true);
+                endif;
+            endif;
+        endif;
+		
+//*******************************************
+// Meeting Mission Objectives
+//*******************************************
+
+//Mission Objective 1	  Primary: Destroy Enemy Threat At Nav Alpha
+			If (Objective1Win == false) then
+				If groupalldead(groupobjectID(13)) and groupalldead(groupobjectID(12)) then
+					Objective1Win = true;
+					PlayVoiceOverOnce("vox\op5\mi4\alpha", TALKER_BAD);
+					PlayVoiceOverOnce("vox\op5\mi4\alpha", TALKER_ERI);
+						If (Objective2Win == false) then
+							SetNavPoint(ena_Nav_Beta);
+						endif;
+					successobjective(eob_objective1);
+				endif;
+			endif;
+
+
+//Mission Objective 2	  Primary: Destroy Enemy Mechs At Nav Beta
+			If (Objective2Win == false) then
+				If groupalldead(groupobjectID(33)) then
+					Objective2Win = true;
+					PlayVoiceOverOnce("VO\Generic\NavBeta", TALKER_BET);
+						If (Objective3Win == false) then
+							SetNavPoint(ena_Nav_Gamma);
+						endif;
+					successobjective(eob_objective2);
+				endif;
+			endif;
+
+//Mission Objective 3	  Primary: Destroy Enemy Mechs At Nav Gamma
+			If (Objective3Win == false) then
+				If groupalldead(groupobjectID(31)) and groupalldead(groupobjectID(37)) and groupalldead(groupobjectID(41)) and groupalldead(groupobjectID(45)) then
+					Objective3Win = true;
+					PlayVoiceOverOnce("VO\Generic\NavGamma", TALKER_BET);
+					successobjective(eob_objective3);
+                    starttimer(1);  // This timer gives a delay before the first mid-mission cineractive
+				endif;
+			endif;
+
+            if (not GetGlobalTrigger(2)) then
+                if (timegreater(1,5)) then
+                    SetGlobalTrigger(2,true);
+                    killtimer(1);
+                    trans WhereisDupree;
+                endif;
+            endif;
+
+/*Mission Objective 4	  Primary: Destroy Steiner Headquarters Building At Nav Gamma
+			If (Objective4Win == false) then
+				If (isdead(HQ) and (Objective3Win == false) and (groupalldead(groupobjectID(37)))) then
+					successobjective(eob_objective4);
+					Objective4Win = true;
+					revealobjective(eob_objective5);
+						trans MiddleCinema;
+				endif;
+			endif; */
+
+//Mission Objective 5	  Primary: Destroy The Airborne Steiner Escape Pod
+			If (Objective5Win == false) then
+				If isdead(eve_Escape_Pod) then
+					successobjective(eob_objective5);
+					PlayVoiceOverOnce("vox\op5\mi4\Dupree", TALKER_ERI);
+					Objective5Win = true;
+				endif;
+			endif;
+            
+//Mission Objective 6	  Kill Dupree
+			If (Objective6Win == false) then
+				If isdead(eve_carissa_dupree) then
+					successobjective(eob_objective6);
+					Objective6Win = true;
+                    KillVoiceOvers;
+                    PlayVoiceOverOnce("vox\op5\mi4\Defeat", TALKER_DUP);
+                    StartTimer(4);  // This is the timer for when the second mid-mission cineractive starts
+				endif;
+			endif;
+            
+            if (not GetGlobalTrigger(4)) then   // This trans to the second mid-mission cineractive
+                if (timegreater(4,5)) then
+                    killtimer(4);
+                    SetGlobalTrigger(4,true);
+                    trans TakeOff;
+                endif;
+            endif;
+
+	//End it when all objectives are completed
+		if (missionwon == false) then
+			if (objective5win == true) then
+					missionwon = true;
+					StartTimer(gti_Timer_21);
+					ResetTimer(gti_Timer_21);
+				trans won;
+			endif;
+		endif;
+
+		//if (MidCinStop == False) then
+			//if (Damaged == TRUE) then
+				//trans MiddleCinema;
+			//endif;
+		//endif;
+                
+        
+    // This block kills off your lancemates fast in the Carissa duel
+        if (not GetGlobalTrigger(5)) then
+            if (timegreater(7,1)) then
+                HP1 = GetHP(GetLancemate(1));
+                HP2 = GetHP(GetLancemate(2));
+                HP3 = GetHP(GetLancemate(3));
+                SetGlobalTrigger(5,true);
+            endif;
+        endif;
+            
+        if (timegreater(7,1)) then
+            if (LanceAlive == 1) then
+                if (GetLancemate(1)<>NO_UNIT) then
+                    if (not isdead(GetLancemate(1))) then
+                        if (GetHP(GetLancemate(1))<HP1) then
+                            Destroy(GetLancemate(1));
+                            SelfDestruct(GetLancemate(1));
+                            ResetTimer(7);
+                            SetGlobalTrigger(5,false);
+                            if (DupreeKill==0) then
+                                PlayVoiceOverOnce("vox\op5\mi4\TwoDown", TALKER_DUP);
+                                PlayVoiceOverOnce("vox\op5\mi4\TwoDown", TALKER_ERI);
+                                DupreeKill = 1;
+                            else
+                                PlayVoiceOverOnce("vox\op5\mi4\ThreeDown", TALKER_DUP);
+                                StartTimer(5);
+                            endif;
+                        endif;
+                    endif;
+                endif;
+                if (GetLancemate(2)<>NO_UNIT) then
+                    if (not isdead(GetLancemate(2))) then
+                        if (GetHP(GetLancemate(2))<HP2) then
+                            ResetTimer(7);
+                            SetGlobalTrigger(5,false);
+                            Destroy(GetLancemate(2));
+                            SelfDestruct(GetLancemate(2));
+                            if (DupreeKill==0) then
+                                PlayVoiceOverOnce("vox\op5\mi4\TwoDown", TALKER_DUP);
+                                PlayVoiceOverOnce("vox\op5\mi4\TwoDown", TALKER_ERI);
+                                DupreeKill = 1;
+                            else
+                                PlayVoiceOverOnce("vox\op5\mi4\ThreeDown", TALKER_DUP);
+                                StartTimer(5);
+                            endif;
+                        endif;
+                    endif;
+                endif;
+                if (GetLancemate(3)<>NO_UNIT) then
+                    if (not isdead(GetLancemate(3))) then
+                        if (GetHP(GetLancemate(3))<HP3) then
+                            ResetTimer(7);
+                            SetGlobalTrigger(5,false);
+                            Destroy(GetLancemate(3));
+                            SelfDestruct(GetLancemate(3));
+                            if (DupreeKill==0) then
+                                PlayVoiceOverOnce("vox\op5\mi4\TwoDown", TALKER_DUP);
+                                PlayVoiceOverOnce("vox\op5\mi4\TwoDown", TALKER_ERI);
+                                DupreeKill = 1;
+                            else
+                                PlayVoiceOverOnce("vox\op5\mi4\ThreeDown", TALKER_DUP);
+                                StartTimer(5);
+                            endif;
+                        endif;
+                    endif;
+                endif;
+            endif;
+        endif;
+        
+        if (MoviePlayed) then
+            if (not isdead(eve_carissa_dupree)) then
+                if (timegreater(5,9)) then
+                    PlayVoiceOverOnce("vox\op5\mi4\Colonel", TALKER_DUP);
+                    PlayVoiceOverOnce("vox\op5\mi4\Colonel", TALKER_ERI);
+                endif;
+                
+                if (timegreater(5,23)) then
+                    PlayVoiceOverOnce("vox\op5\mi4\Wonder", TALKER_DUP);
+                endif;
+    
+                if (timegreater(5,34)) then
+                    PlayVoiceOverOnce("vox\op5\mi4\Academy", TALKER_DUP);
+                endif;
+            endif;
+        endif;
+        
+        if (LanceAlive == 1) then
+            if (GroupAllDead(GroupObjectID(2))) then
+                SetTargetDesirability(playermech,100);
+            endif;
+        endif;
+        
+        
+        if (GetGlobalTrigger(1)) then       // This is to make it so your lancemates won't fire on Dupree
+            if (not GroupAllDead(GroupObjectID(2))) then
+                if (GetLancemate(1)<>NO_UNIT) then
+                    if (not isdead(GetLancemate(1))) then
+                        SetTarget(GetLancemate(1),NO_UNIT);
+                    endif;
+                endif;
+                if (GetLancemate(2)<>NO_UNIT) then
+                    if (not isdead(GetLancemate(2))) then
+                        SetTarget(GetLancemate(2),NO_UNIT);
+                    endif;
+                endif;
+                if (GetLancemate(3)<>NO_UNIT) then
+                    if (not isdead(GetLancemate(3))) then
+                        SetTarget(GetLancemate(3),NO_UNIT);
+                    endif;
+                endif;
+            endif;
+        endif;
+					
+endstate;
+
+//-----------------------------------------
+//HERE THERE BE CINEMAS
+//-----------------------------------------
+
+state opening;
+
+	code
+
+	SetAudioFXEnabled(false);
+
+
+	if (cinemaskip) then
+		KillVoiceOvers;
+		cinema_cut = 0;
+		KillTimer(gti_timer_21);
+		SetGlobalTrigger(0,true);
+		playerai(epl_player0,false);
+
+			If IntroSpoke == False then
+					PlayVoiceOverOnce("vox\op5\mi4\Intro", TALKER_BAD);
+					PlayVoiceOverOnce("vox\op5\mi4\Intro", TALKER_ERI);
+					PlayLanceMateSound("vox\op5\mi4\Intro",3);				//this is the right way
+					//PlayVoiceOverOnce("vox\op5\mi4\Intro", TALKER_ISA);
+					//PlayVoiceOverOnce("vox\op5\mi4\Intro", TALKER_CAI);
+					//PlayVoiceOverOnce("vox\op5\mi4\Intro", TALKER_GRE);
+					PlayVoiceOverOnce("vox\op5\mi4\Sharp", TALKER_ERI);
+				IntroSpoke = True;
+			endif;
+		
+		CinemaEnd;
+
+		//if (GetLancemate(1) <> NO_UNIT) then
+		//	LancemateCommand(GetLancemate(1),LANCEMATE_STOP);
+		//endif;
+
+        RevealObjective(eob_objective6);    // FAB
+
+		trans sit;
+	endif;
+
+ 	switch (cinema_cut)
+
+			case 0:
+				
+				SetActiveCamera (eca_CameraShip);
+				Targetfollowobject(playermech);
+				targetoffset(0.0,5.0,0.0,0.0,false);
+
+				SetCameraFootShake(playermech,100);
+
+				FadeToBlack(0.0);
+				FadeFromBlack(6.0);
+				cinema_cut = cinema_cut + 1;
+
+			endcase;
+
+		case 1:
+
+					camerafollowobject(playermech);
+					Cameraoffset(150.0,50.0,50.0,0.0,true);					//
+					Cameraoffset(-50.0,15.0,-75.0,15.0,true);					//
+
+					//Cameraoffset(-100.0,50.0,50.0,0.0,true);					//
+					//Cameraoffset(-50.0,15.0,-75.0,10.0,true);					//
+
+		if (TimeGreater(gti_Timer_21,3)) then											//Mt01=Just for Voice Timing
+			If IntroSpoke == False then
+					PlayVoiceOverOnce("vox\op5\mi4\Intro", TALKER_BAD);
+					PlayVoiceOverOnce("vox\op5\mi4\Intro", TALKER_ERI);
+					PlayLanceMateSound("vox\op5\mi4\Intro",3);						 //this is the right way
+					//PlayVoiceOverOnce("vox\op5\mi4\Intro", TALKER_ISA);
+					//PlayVoiceOverOnce("vox\op5\mi4\Intro", TALKER_CAI);
+					//PlayVoiceOverOnce("vox\op5\mi4\Intro", TALKER_GRE);
+					PlayVoiceOverOnce("vox\op5\mi4\Sharp", TALKER_ERI);
+				IntroSpoke = True;
+			endif;
+		endif;
+
+			if (TimeGreater(gti_Timer_21,5)) then
+        ResetTimer(gti_Timer_21);
+				//SetActiveCamera (eca_CameraShip);						//this is a repeat	Mt01
+				//Targetfollowobject(playermech);
+				//targetoffset(0.0,8.0,0.0,0.0,false);
+				cinema_cut = cinema_cut + 2;									//skip the other camera angle
+			endif;
+
+		endcase;
+
+			case 2:
+				if (TimeGreater(gti_Timer_21,6)) then					//be thinking about teleport 'bout now?
+					ResetTimer(gti_Timer_21);
+					//SetActiveCamera (eca_CameraShip);
+					SetGlobalTrigger(0,true);
+					FadeToBlack(0.0);
+					SetActiveCamera (eca_CameraShip2);
+					FadeFromBlack(3.0);
+					//MoveSomething;															//Function That teleports Player&Lancemate line	212
+					cinema_cut = cinema_cut + 1;
+				endif;
+
+			endcase;
+
+			case 3:
+
+				if (TimeGreater(gti_Timer_21,7)) then					//
+					ResetTimer(gti_Timer_21);
+					cinema_cut = cinema_cut + 1;
+				endif;
+
+			endcase;
+
+			case 4:
+
+			if (TimeGreater(gti_Timer_21,5)) then
+					//Cameraoffset(200.0,10.0,175.0,6.0,true);					//Spread it out
+			endif;
+
+				if (timegreater(gti_Timer_21,7)) then
+					//PlayVoiceOverOnce("VO\OP2\MI1\DownReply", TALKER_IAN);
+					cinema_cut = 0;
+					resettimer (gti_Timer_21);
+					killtimer(gti_timer_21);
+					playerai(epl_player0,false);
+					cinemaend;
+
+					//if (GetLancemate(1) <> NO_UNIT) then
+					//	LancemateCommand(GetLancemate(1),LANCEMATE_STOP);
+					//endif;
+
+                    RevealObjective(eob_objective6);    // FAB
+
+					trans sit;
+				endif;
+
+			endcase;
+
+		endswitch;
+
+
+endstate;
+
+state won;
+
+	var
+
+		integer			wimpy;
+
+		code
+
+	If (TimeGreater(gti_Timer_21,4)) then
+
+			SetCompositingEnabled(False);
+			playerai(epl_player0,true);
+			StartMusic("Music\Aftermath",3.5,3.0,50);
+			EndMission(true,16);								 //I changed for Mt01 from 45
+
+			trans won2;
+
+	endif;
+
+endstate;
+
+state won2;
+
+		code
+
+	//SetCompositingEnabled(False);
+
+		PlayVoiceOverOnce("vox\op5\mi4\victory", TALKER_BAD);
+		PlayLanceMateSound("vox\op5\mi4\victory",1);						 //this is the right way
+		PlayVoiceOverOnce("vox\op5\mi4\victory", TALKER_ERI);
+        trans won3;
+
+endstate;
+
+state won3;
+
+		code
+
+			if (cinemaskip) then
+				KillVoiceOvers;
+			cinema_cut = 20;
+
+				KillTimer(gti_timer_21);
+				SetGlobalTrigger(0,true);
+				//playerai(epl_player0,false);
+				//SetAudioFXEnabled(true);
+				FadeToBlack(1.0);
+				EndMission(true,1);
+				//CinemaEnd;								//  SAGE Without the cinema end...this is a nice transition to shell
+			endif;
+
+	switch (cinema_cut)
+
+			case 0:
+				CinemaStart;
+
+				SetActiveCamera (eca_CameraShip);
+
+				FadeToBlack(0.0);
+
+				StartTimer(gti_Timer_21);
+				ResetTimer(gti_Timer_21);
+				cinema_cut = cinema_cut + 1;
+
+			endcase;
+
+			case 1:
+					ResetTimer(gti_Timer_21);
+					Targetfollowobject(playermech);
+					camerafollowobject(playermech);
+					targetoffset(0.0,2.0,0.0,0.0,false);
+					Cameraoffset(50.0,85.0,0.0,0.0,true);					//45
+					Cameraoffset(-25.0,5.0,-75.0,18.0,true);			//25
+					FadeFromBlack(2.0);
+					cinema_cut = cinema_cut + 1;
+			endcase;
+
+			case 2:
+
+				If (PlayerEnd == true) then
+					cinema_cut = cinema_cut + 1;
+				endif;
+
+			endcase;
+
+			case 3:
+				if (TimeGreater(gti_Timer_21,18)) then
+					ResetTimer(gti_Timer_21);
+					Targetfollowobject(playermech);
+					camerafollowobject(playermech);
+					targetoffset(0.0,2.0,0.0,0.0,false);
+					Cameraoffset(150.0,85.0,0.0,0.0,true);					//45
+					Cameraoffset(-75.0,35.0,-175.0,10.0,true);			//25
+					FadeFromBlack(2.0);
+					cinema_cut = cinema_cut + 1;
+				endif;
+			endcase;
+
+			case 4:
+				if (TimeGreater(gti_Timer_21,11)) then
+					Cameraoffset(155.0,135.0,75.0,10.0,true);				//25
+				endif;
+
+				if (timegreater(gti_Timer_21,48)) then
+					cinema_cut = 0;
+					resettimer (gti_Timer_21);
+					killtimer(gti_timer_21);
+					cinemaend;
+				endif;
+			endcase;
+
+		endswitch;
+
+endstate;
+
+state lostdead;
+
+		code
+
+	SetCompositingEnabled(False);
+
+		StartMusic("Music\Defeat",3.5,3.0,50);
+		EndMission(False,15);
+		trans lostdead2;
+endstate;
+
+state lostdead2;
+
+		code
+
+			if (cinemaskip) then
+				KillVoiceOvers;
+			    cinema_cut = 20;
+
+				KillTimer(gti_timer_21);
+				SetGlobalTrigger(0,true);
+				playerai(epl_player0,false);
+				//SetAudioFXEnabled(true);
+				FadeToBlack(1.0);
+				EndMission(false,1);
+				//CinemaEnd;							 // trying with Cinema end  Without the cinema end...this is a nice transition to shell
+			endif;
+
+		switch cinema_cut
+
+			case 0:
+				CinemaStart;
+				setactivecamera (eca_cameraship);                  //moved above fade to black 9-6
+				Fadetoblack(0.0);
+				FadeFromBlack(2.0);
+				Targetfollowobject(playermech);
+				Camerafollowobject(playermech);
+				Targetoffset(0.0,4.0,0.0,0.0,false);
+				Cameraoffset(0.0,20.0,75.0,0.0,false);
+				Cameraoffset(60.0,125.0,25.0,20.0,false);
+		
+        if (EscapeTime == TRUE) and (objective5win == FALSE) and not isdead(playermech) then
+			PlayVoiceOverOnce("vox\Generic\MissTarget", TALKER_BAD);		//
+        else
+		if isdead(playermech) then
+			PlayVoiceOverOnce("vox\Generic\EriDestroyed", TALKER_BAD);	//  All of these lines were Mandril
+			PlayVoiceOverOnce("vox\Generic\abort2", TALKER_BAD);		//
+		else
+			PlayVoiceOverOnce("vox\Generic\abort2", TALKER_BAD);		//
+		endif;
+		endif;
+				
+				Cinema_cut=Cinema_cut+1;
+			endcase;
+
+			case 1:
+			
+			endcase;
+
+		endswitch;
+endstate;
+
+state MiddleTriggers;
+
+		code
+
+				EscapeTime = TRUE;
+				MidCinStart = True;
+		StartMusic("Music\DFA",3.5,3.0,50);
+		
+		PlayVoiceOverOnce("vox\op5\mi4\pod", TALKER_BAD);
+		PlayVoiceOverOnce("vox\op5\mi4\pod", TALKER_DUP);
+		
+        PlayVoiceOverOnce("vox\op5\mi4\dupree", TALKER_BAD);
+		
+		ResetTimer(6);								//Function Timer
+		starttimer(gti_timer_6);
+        
+		trans sit;
+endstate;
+
+state MiddleCinema;
+
+		code
+
+	SetCompositingEnabled(False);
+
+				TeleportStart = TRUE;
+				EscapeTime = TRUE;
+				MidCinStart = True;
+		
+		StartMusic("Music\DFA",3.5,3.0,50);
+		
+		PlayVoiceOverOnce("vox\op5\mi4\pod", TALKER_DUP);
+		
+		ResetTimer(gti_Timer_21);
+		
+		playerai(epl_player0,true);
+		
+				FadeToBlack(0.0);
+				FadeFromBlack(1.0);
+		
+		trans MiddleCinema2;
+endstate;
+
+state MiddleCinema2;
+
+		code
+
+/*			
+			if (cinemaskip) then	//if there is a cinema skip we gotta teleport everyone around
+				KillVoiceOvers;
+				cinema_cut = 0;
+
+				KillTimer(gti_timer_21);
+				playerai(epl_player0,false);
+				//SetAudioFXEnabled(true);
+				MidCinStop = True;
+				CinemaEnd;
+				trans sit;
+			endif;
+*/
+		
+		switch cinema_cut
+
+			case 0:
+				
+				CinemaStart;
+				
+				setactivecamera (eca_cameraship);
+				//Fadetoblack(7.0);
+				Targetfollowobject(eve_Escape_Pod);
+				Camerafollowobject(eve_Escape_Pod);
+				Targetoffset(0.0,4.0,0.0,0.0,false);
+				Cameraoffset(0.0,20.0,75.0,0.0,false);
+				Cameraoffset(60.0,125.0,25.0,15.0,false);
+				
+				if (TimeGreater(gti_Timer_21,8)) then
+					Fadetoblack(0.0);
+					Fadefromblack(2.0);
+					//ResetTimer(gti_Timer_21);
+					Cinema_cut = Cinema_cut + 1;
+				endif;
+			
+			endcase;
+
+			case 1:
+				if (TimeGreater(gti_Timer_21,7)) then
+					MidCinStop = True;
+					CinemaEnd;
+					playerai(epl_player0,false);
+					trans sit;
+				endif;
+			endcase;
+
+		endswitch;
+endstate;
+
+state WhereisDupree;    // FAB  This is the first mid-mission cinema
+    code
+
+		switch cinema_cut
+
+			case 0:     // Shot of the player going to Nav Gamma
+				
+                //Destroy(GroupObjectID(45));
+    			SetCompositingEnabled(False);
+    			CinemaStart;
+                playerai(epl_player0,true);                
+				
+				setactivecamera (eca_cameraship);
+				Targetfollowobject(playermech);
+				Camerafollowobject(playermech);
+                
+                SetTargetDesirability(playermech,-1);   // Until your lancemates all die, Carissa ignores you
+                SetCameraFootShake(playermech,100);
+
+    			targetoffset(0.0,7.0,0.0,0.0,false);
+    			Cameraoffset(-90.0,35.0,12.0,0.0,false);
+    			Cameraoffset(90.0,4.0,64.0,10.0,false);
+                
+                StartTimer(21);
+                ResetTimer(21);
+                
+                if (not iswithin(playermech,ena_nav_gamma,500)) then
+                    PlayVoiceOverOnce("vox\op5\mi4\awayHQ",TALKER_ERI);
+                else
+                    PlayVoiceOverOnce("vox\op5\mi4\nearHQ",TALKER_ERI);
+                endif;
+                
+                LanceAlive = 0;
+    
+                Cinema_cut = Cinema_cut + 1;
+			
+			endcase;
+
+			case 1:     // Shot of Steiner HQ
+                if (TimeGreater(21,5)) then
+                    FadetoBlack(1.0);
+                endif;
+
+                if (TimeGreater(21,8)) then
+    				Targetfollowobject(ebu_obj_steinerHQ);
+    				Camerafollowobject(ebu_obj_steinerHQ);
+                    FadefromBlack(3.0);
+                
+        			targetoffset(0.0,25.0,0.0,0.0,false);
+        			Cameraoffset(-300.0,65.0,12.0,0.0,false);
+        			Cameraoffset(-80.0,10.0,124.0,10.0,false);
+                    
+                    Cinema_cut = Cinema_cut + 1;
+                endif;
+            endcase;
+
+			case 2:     // Get all units into place
+                GetLocation(ena_eric,mynav);
+                teleport(playermech,mynav);
+                StandStill = True;
+                
+                if (GetLancemate(1)<>NO_UNIT) then
+                    if (not IsDead(GetLancemate(1))) then
+                        GetLocation(ena_lance1,mynav);
+                        teleport(GetLancemate(1),mynav);
+                        StopExecute(GetLancemate(1));
+                        HP1 = GetHP(GetLancemate(1));
+                    endif;
+                endif;
+        
+                if (GetLancemate(2)<>NO_UNIT) then
+                    if (not IsDead(GetLancemate(2))) then
+                        GetLocation(ena_lance2,mynav);
+                        teleport(GetLancemate(2),mynav);
+                        StopExecute(GetLancemate(2));
+                        HP2 = GetHP(GetLancemate(2));
+                    endif;
+                endif;
+                
+                if (GetLancemate(3)<>NO_UNIT) then
+                    if (not IsDead(GetLancemate(3))) then
+                        GetLocation(ena_lance3,mynav);
+                        teleport(GetLancemate(3),mynav);
+                        StopExecute(GetLancemate(3));
+                        HP3 = GetHP(GetLancemate(3));
+                    endif;
+                endif;
+                
+                Cinema_cut = Cinema_cut + 1;
+			endcase;
+
+    	    case 3:     // Shot of the player next to the HQ
+                if (timegreater(21,15)) then
+                    Targetfollowobject(playermech);
+                    Camerafollowobject(playermech);
+                    
+                    SetCameraFootShake(playermech,100);
+    
+                    targetoffset(0.0,7.0,0.0,0.0,false);
+                    Cameraoffset(0.0,2.0,-30.0,0.0,false);
+                    Cameraoffset(0.0,4.0,-40.0,10.0,false);
+                    
+                    PlayVoiceOverOnce("vox\generic\Powerup2Knight",TALKER_BAD);
+                    
+                    Cinema_cut = Cinema_cut + 1;
+                endif;
+            endcase;
+
+            case 4:     // Dupree will teleport in and kill someone then cineractive ends
+                if (timegreater(21,16)) then
+                    SetGlobalTrigger(1,true);   // This teleports Dupree to her spawn point
+                    SetTargetDesirability(eve_carissa_dupree,-1);
+                endif;
+                
+                StartMusic("Music\DFA",3.5,3.0,50);
+                SetGroupAI((groupobjectid(2)),groupai_none);
+                
+                if (LanceAlive == 0) then
+                    if (GetLancemate(1)<>NO_UNIT) then
+                        if (GetHP(GetLancemate(1))<HP1) then
+                        //if (WhoShot(GetLancemate(1))==eve_carissa_dupree) then
+                            Destroy(GetLancemate(1));
+                            SelfDestruct(GetLancemate(1));
+                            LanceAlive = 1;
+                            PlayVoiceOverOnce("vox\op5\mi4\OneDown",TALKER_DUP);
+                            PlayVoiceOverOnce("vox\op5\mi4\OneDown",TALKER_ERI);
+                        endif;
+                    endif;
+                    if (GetLancemate(2)<>NO_UNIT) then
+                        if (GetHP(GetLancemate(2))<HP2) then
+                        //if (WhoShot(GetLancemate(2))==eve_carissa_dupree) then
+                            //if (not LanceAlive == 1) then
+                                Destroy(GetLancemate(2));
+                                SelfDestruct(GetLancemate(2));
+                                LanceAlive = 1;
+                                PlayVoiceOverOnce("vox\op5\mi4\OneDown",TALKER_DUP);
+                                PlayVoiceOverOnce("vox\op5\mi4\OneDown",TALKER_ERI);
+                            //endif;
+                        endif;
+                    endif;
+                    if (GetLancemate(3)<>NO_UNIT) then
+                        if (GetHP(GetLancemate(3))<HP3) then
+                        //if (whoshot(GetLancemate(3))==eve_carissa_dupree) then
+                            //if (not LanceAlive == 1) then
+                                Destroy(GetLancemate(3));
+                                SelfDestruct(GetLancemate(3));
+                                LanceAlive = 1;
+                                PlayVoiceOverOnce("vox\op5\mi4\OneDown",TALKER_DUP);
+                                PlayVoiceOverOnce("vox\op5\mi4\OneDown",TALKER_ERI);
+                            //endif;
+                        endif;
+                    endif;
+                endif;
+
+                if (LanceAlive == 1) then       // Once one of your men is killed the rest will act
+                    if (GetLancemate(1)<>NO_UNIT) then
+                        if (not IsDead(GetLancemate(1))) then
+                            StartExecute(GetLancemate(1));
+                        endif;
+                    endif;
+                    if (GetLancemate(2)<>NO_UNIT) then
+                        if (not IsDead(GetLancemate(2))) then
+                            StartExecute(GetLancemate(2));
+                        endif;
+                    endif;
+                    if (GetLancemate(3)<>NO_UNIT) then
+                        if (not IsDead(GetLancemate(3))) then
+                            StartExecute(GetLancemate(3));
+                        endif;
+                    endif;                
+                    
+                    StartTimer(2);
+                    StartTimer(7);      // Your lancemates get a grace period to live
+                    Cinema_Cut = Cinema_Cut + 1;
+                endif;
+                
+                if (LanceNum == 0) or (LanceNum == GroupNumDead(GroupObjectID(2))) then
+                    starttimer(2);
+                    AllAlone = True;    // No lancemates for the player
+                    PlayVoiceOverOnce("vox\op5\mi4\OneDown",TALKER_DUP);    // These lines still make sense with one person
+                    PlayVoiceOverOnce("vox\op5\mi4\OneDown",TALKER_ERI);
+                    SetTargetDesirability(playermech,100);
+                    Cinema_Cut = Cinema_Cut + 1;
+                endif;
+                
+            endcase;
+            
+            case 5:
+                if (timegreater(2,3)) then
+                    starttimer(5);      // This is to play Carissa's taunt lines
+                    MoviePlayed = True;
+                    KillTimer(2);
+                    KillTimer(21);
+                    Cinema_Cut = 0;
+                    playerai(epl_player0,false);                
+                    CinemaEnd;
+                    SetCompositingEnabled(True);
+                    SetGlobalTrigger(1,true);   // This teleports Dupree to her spawn point
+                    SetTargetDesirability(eve_carissa_dupree,-1);
+                    StandStill = False;
+                    trans sit;
+                endif;
+            endcase;
+
+		endswitch;
+    
+endstate;
+
+state TakeOff;      // This is the pre take off cineractive
+    code
+
+        switch cinema_cut
+			
+            case 0:     // Shot of Steiner HQ
+                SetCompositingEnabled(False);
+                CinemaStart;
+                playerai(epl_player0,true);
+                
+                StartMusic("Music\Victory2",3.5,3.0,50);
+                
+                KillVoiceOvers;
+                PlayVoiceOverOnce("vox\op5\mi4\FakeVictory",TALKER_ERI);
+                PlayVoiceOverOnce("vox\generic\MutliDown3",TALKER_BAD);
+                PlayVoiceOverOnce("vox\op5\mi4\FlamingRock",TALKER_ERI);
+                PlayVoiceOverOnce("vox\op5\mi4\Kentares",TALKER_BAD);
+                PlayVoiceOverOnce("vox\op5\mi4\Kentares",TALKER_ERI);
+
+                setactivecamera (eca_cameraship);
+				TargetfollowObject(playermech);
+				Camerafollowobject(playermech);
+				SetCameraFootShake(playermech,70);
+				targetoffset(0.0,4.0,0.0,0.0,false);
+				Cameraoffset(-95.0,25.0,0.0,0.0,false);
+				Cameraoffset(100.0,25.0,-120.0,37.0,false);
+
+                EscapePrelim = true;    // Teleport in the escape pod for the movie
+                                
+                StartTimer(21);
+                ResetTimer(21);
+
+				cinema_cut = cinema_cut + 1;
+			endcase;
+            
+            case 1:
+                if (timegreater(21,25)) then
+    				Targetfollowobject(ebu_obj_steinerHQ);
+    				Camerafollowobject(ebu_obj_steinerHQ);
+
+                    GetLocation(ena_eric2,mynav);
+                    teleport(playermech,mynav);
+                    StandStill = True;
+                
+        			targetoffset(0.0,25.0,0.0,0.0,false);
+        			Cameraoffset(30.0,100.0,-200.0,0.0,false);
+        			Cameraoffset(70.0,95.0,-50.0,15.0,false);
+
+                    StartMusic("Music\Push",1.0,1.0,50);
+
+                    PlayVoiceOverOnce("vox\op5\mi4\Surprise",TALKER_BAD);
+                    PlayVoiceOverOnce("vox\op5\mi4\Surprise",TALKER_ERI);
+            		PlayVoiceOverOnce("vox\op5\mi4\pod", TALKER_BAD);
+		            PlayVoiceOverOnce("vox\op5\mi4\pod", TALKER_DUP);
+                    
+                    Cinema_cut = Cinema_cut + 1;
+                endif;
+            endcase;
+			
+            case 2:
+                if (timegreater(21,40)) then
+                    KillTimer(21);
+                    Cinema_Cut = 0;
+                    playerai(epl_player0,false);                
+                    CinemaEnd;
+                    SetCompositingEnabled(True);
+                    StandStill = False;
+                    EscapeTime = True;
+                    StartTimer(6);
+                    trans sit;
+                endif;
+            endcase;
+            
+        endswitch;
+    
+endstate;
+
+endfsm.
+
+//******************************************************************

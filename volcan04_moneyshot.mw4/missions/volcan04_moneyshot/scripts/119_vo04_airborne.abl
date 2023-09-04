@@ -1,0 +1,340 @@
+
+//*********************************************************************************
+//The below line MUST be changed in order for the script to be considered
+//a unique entity.  The word Patrol must be changed to some other unique identifier
+fsm Vo04_Airborne : integer;
+
+//This unit patrols a specific path and attacks anything that comes near it.
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//
+//     Variable Declarations
+//
+//------------------------------------------------------------------
+	var
+	static integer			attackrange; 			// When do I start shooting?
+																
+	static integer			piloting; 				// piloting skill
+	static integer			gunnery; 					// hit chance,
+	static real					mindelay;					// minimum amount of time I will wait between shots once a weapon is reloaded
+	static real					maxdelay;					// maximum amount of time I will wait between shots once a weapon is reloaded
+	static integer 			speed;			 			// What speed so I move at?
+	static integer 			elitelevel; 			// % elite chance, This helps determine tactics, defensive manuevers, opportunity fire
+																				// and other things that would normally be determined by combat experience
+
+ 	static integer			isshotradius;			// how far away from me will I detect an enemy shot.
+	static integer			movetype;					// how will it move down the path?
+
+	static Boolean 			attacksoundplayed;
+	static integer 			attacksound; 			// plays when it first attacks
+	static integer 			deathsound; 			// plays when it dies
+	
+	static integer			mood;							// What is my normal mood?
+	
+	static Boolean			Resumed;					// Have I gotten to the end of the path?
+	static Boolean			reachedendofpath;				// Have I gotten to the end of the path?
+																							// Note: This only gets set if movetype is set to move_nocycle.
+	static integer			path;						 				// what path am I following?
+	static Boolean 			attackersdistractit;		// if FALSE, it won't leave the path, even when things
+																							// are shooting it. It will shoot back. Defaults to true
+																							// Once unit reaches the end of the path, It attacks freely.
+
+	static integer			Base;							// Where is my Base?  Am i too good for my HOME?
+	
+	static Boolean 			Secret;						// They are Powered down in Ambush
+	static Boolean 			Elite;						// These guys go to hell -  and back
+	
+	static integer			takeOffDistance;	// My take-off distance if I'm an airplane (ignored if not an airplane)
+	
+	static Locpoint 		myStart;					//	where I begin the game
+	static Boolean			MyTrigger;				// What Global Boolean Sets me off?
+//------------------------------------------------------------------
+//
+//     Local Functions
+//
+//------------------------------------------------------------------
+
+function init;
+	code
+	
+	//These variables should not be changed by the designer without good reason
+		
+		attackrange         = 950;
+		piloting            = 50;
+		gunnery             = 65;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype            = move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= -1;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		takeOffDistance			= 150;
+		attacksound 				= -1;
+		deathsound 					= -1;
+		Secret 							= FALSE;									//They are not in hiding
+		Elite 							= FALSE;
+	
+		takeOffDistance			= 150;
+	
+	//Use this to set different values for different units using the same brain	
+	switch (GetMemoryInteger(me,9))
+
+	case 0:															 //Escape Pod
+		
+		// All Defined Above
+		takeOffDistance	= 1;
+		
+	endcase;
+		
+		case 10:																	//				CrackCopt
+			path 								= epa_Path_CrackCopt;
+		endcase;
+		
+		case 18:																	//				When isshot grp 20
+			path 								= epa_Path_BombRun;
+			MyTrigger						= BombTime;
+		endcase;
+		
+		case 86:																 //					Takes off when building damaged
+			path 								= -1;
+			MyTrigger						= EscapeTime;
+			Secret 							= TRUE;												//They ARE in hiding
+		endcase;
+		
+	endswitch;
+
+endfunction;
+
+//------------------------------------------------------------------
+//
+//     Main Code
+//
+//------------------------------------------------------------------
+state startState;
+
+	code
+		
+		SetFiringDelay					(me,mindelay,maxdelay);
+		setignorefriendlyfire		(me,true);
+		setisshotradius					(me,isshotradius);
+		setentropymood					(me,mood);
+		setcurmood							(me,mood);
+		setskilllevel						(me,piloting,gunnery,elitelevel);
+		//setsearchlight				(me,on);
+		//startexecute					(me);
+		//setalignment					(me,enemy);
+		
+
+		GetLocation(me,mystart);
+		
+		if (GetMemoryInteger(me,9) == 0) then		
+				shutdown(me);
+				TeleportToHell(me);		
+			trans EscapeWait;
+		endif;
+	
+	if (orderTakeOff(takeOffDistance) == true) then	
+		if (secret == true) then
+			shutdown(me);
+			trans hangout;
+		endif;
+		
+		if (Elite == True) then
+			shutdown(me);
+			TeleportToHell(me);
+			trans hangoutELITE;
+		else
+			trans patrol;
+		endif;
+	endif;
+
+endstate;			
+
+state deadState;
+  code
+		
+		//orderDie;
+
+endstate;
+
+state Hangout;
+  code
+
+				If ((isShot (me)))	then
+					startup(me);
+					trans patrol;
+				endif;
+				
+/*				if ((iswithin(me,(groupobjectid(1)),200)) == true) then
+					startup(me);
+					trans patrol;
+				endif;
+*/						
+				If (MyTrigger == true) then
+					startup (me);
+					trans patrol;
+				endif;
+
+endstate;
+
+state hangoutELITE;
+  code
+		
+		If (MyTrigger == true) then
+			startup(me);
+			Teleport(me,myStart);
+			orderMoveto(path,speed,movetype,true,true);
+  		setTarget(me,playermech);
+			trans patrol;
+		endif;
+						
+endstate;
+	
+	state patrol;
+
+  var
+
+		ObjectID foe;
+
+		code
+	
+	//Head down the path.  If this has already been done
+	//or if there is no path set then look around
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+					if ((orderMoveto(path,speed,movetype,true,true)) == TRUE) then
+						reachedendofpath = TRUE;
+					endif; 			
+			else	 		 		
+				OrderMoveToObject((playermech),200);			
+			endif;
+			
+		//Find me a target
+			if (setmytarget(attackrange)) then
+				trans attack;
+			endif;
+			
+	endstate;
+
+//------------------------------------------------------------------
+//
+//     attack state : description
+//
+//------------------------------------------------------------------
+	state attack;
+		
+		code
+			
+		if (LeaveAttackState(attackrange*3/2)) then
+			orderstopattacking;
+			if (path <> -1) then
+				orderMoveResumePatrol(path,speed,movetype,true,attackersdistractit);
+				trans patrol;
+			else	 		 		
+				OrderMoveToObject((playermech),200);			
+				trans patrol;
+			endif;
+		endif;
+		
+		//the ever popular attack order
+    orderAttack (attackersdistractit);
+		
+		//play the attack sound if one exists
+		if ((attacksound <> -1) and (attacksoundplayed == FALSE)) then	
+			attacksoundplayed = true;
+			PlaySoundOnce(attacksound);
+		endif;	
+		
+		//maybe swap targets when I am shot
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+
+endstate;
+
+state EscapeWait;
+  code
+	
+	If IsShot(me) then;
+		EscapeTime 	= TRUE;
+	endif;
+    
+    if (EscapePrelim) then
+        Teleport(me,mystart);
+        startup(me);
+        trans EscapeFerret;
+    endif;
+    
+endstate;
+
+state EscapeFerret;
+    code
+	
+	If (EscapeTime == TRUE) then
+		ResetTimer(19);								//TakeOff Timer
+		starttimer(gti_timer_19);
+			PlayVoiceOverOnce("vox\op5\mi4\pod", TALKER_BAD);			//
+		Trans EscapeLaunch;
+	endif;
+
+endstate;
+
+
+state EscapeLaunch;
+  code
+	
+ 		if (TimeGreater(gti_Timer_19,3)) then											
+			PlayVoiceOverOnce("vox\op5\mi4\pod", TALKER_ERI);			//
+ 			if (orderTakeOff(takeOffDistance) == true) then	
+ 				trans PostEscapeLaunch;	
+ 			endif;
+ 		endif;
+
+endstate;
+
+state PostEscapeLaunch;
+  code
+	
+	PlayVoiceOverOnce("vox\op5\mi4\getpods", TALKER_MAN);			//
+			
+			if (TimeGreater(gti_Timer_19,18)) then											
+					trans HellState1;	
+			endif;
+
+endstate;
+
+state HellState1;
+	code
+		
+	SetSensorVisibility(me,false);
+	
+	//TeleportToHell(me);		
+	
+	//trans deadstate;
+		
+endstate;
+
+endfsm.
+//******************************************************************
+

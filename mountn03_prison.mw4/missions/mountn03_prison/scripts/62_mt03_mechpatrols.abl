@@ -1,0 +1,391 @@
+
+//*********************************************************************************
+//The below line MUST be changed in order for the script to be considered
+//a unique entity.  The word Patrol must be changed to some other unique identifier
+fsm Mt03_MechPatrols : integer;
+
+//This unit patrols a specific path and attacks anything that comes near it.
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//
+//     Variable Declarations
+//
+//------------------------------------------------------------------
+	var
+	static integer			attackrange; 			// When do I start shooting?
+																
+	static integer			piloting; 				// piloting skill
+	static integer			gunnery; 					// hit chance,
+	static real					mindelay;					// minimum amount of time I will wait between shots once a weapon is reloaded
+	static real					maxdelay;					// maximum amount of time I will wait between shots once a weapon is reloaded
+	static integer 			speed;			 			// What speed so I move at?
+	static integer 			elitelevel; 			// % elite chance, This helps determine tactics, defensive manuevers, opportunity fire
+																				// and other things that would normally be determined by combat experience
+
+ 	static integer			isshotradius;			// how far away from me will I detect an enemy shot.
+	static integer			movetype;					// how will it move down the path?
+
+	static Boolean 			attacksoundplayed;
+	static integer 			attacksound; 			// plays when it first attacks
+	static integer 			deathsound; 			// plays when it dies
+	
+	static integer			mood;							// What is my normal mood?
+	
+	static Boolean			Resumed;					// Have I gotten to the end of the path?
+	static Boolean			reachedendofpath;			// Have I gotten to the end of the path?
+																						// Note: This only gets set if movetype is set to move_nocycle.
+	static integer			path;						 			// what path am I following?
+	static Boolean 			attackersdistractit;	// if FALSE, it won't leave the path, even when things
+																						// are shooting it. It will shoot back. Defaults to true
+																						// Once unit reaches the end of the path, It attacks freely.
+	static Boolean 			Chaser;								// These guys will give chase
+	static Boolean 			Elite;								// Left from other script
+	
+	static integer			teleportNav;					// All the elites will have this value set to a different Nav
+	
+	static ObjectID 		myPrison;
+	static Boolean			Sleeper; 				// used to shut down Mechs
+  
+//------------------------------------------------------------------
+//
+//     Local Functions
+//
+//------------------------------------------------------------------
+
+function init;
+	code
+	
+	Elite 								= FALSE;
+	 				
+ 	switch (GetMemoryInteger(me,9))
+
+	case 12:															 //Mechs at 12 o'clock noon
+	
+		attackrange					= 950;
+		piloting 				 	= 70;				
+		gunnery 				 	= 50;					
+		mindelay 					= 0.5;				
+		maxdelay 					= 1.0;				
+		speed 						= 60;						
+		elitelevel 					= 60;			
+		IsShotRadius 				= 80;
+		movetype 					= move_nocycle;
+		AttackersDistractIt 		= True;
+		Mood 						= neutral_start;
+		path 						= epa_Path_12;
+		ReachedEndOfPath 		    = False;
+		Resumed 					= False;
+		Attacksoundplayed 			= False;					
+		
+	endcase;
+		
+	case 3:															 //Mechs at 3 o'clock
+			
+		attackrange         = 950;
+		piloting            = 70;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 						= MOVE_SEESAW;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 								= epa_Path_3;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		
+	endcase;
+		
+	case 6:						 									//Mechs at 6 o'clock
+		
+		attackrange         = 950;
+		piloting            = 70;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 			= MOVE_SEESAW;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 				= epa_Path_6;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		
+	endcase;
+		
+	case 9:						 									//Mechs at 9 o'clock
+		
+		attackrange         = 950;
+		piloting            = 70;
+		gunnery             = 50;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 60;
+		IsShotRadius        = 80;
+		movetype 			= MOVE_SEESAW;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 				= epa_Path_9;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		
+	endcase;
+		
+	case 11:															//Mechs to defend center
+	
+		attackrange					= 950;
+		piloting 				 	= 70;				
+		gunnery 				 	= 60;					
+		mindelay 					= 0.5;				
+		maxdelay 					= 1.0;				
+		speed 						= 60;						
+		elitelevel 					= 70;			
+		IsShotRadius 				= 80;
+		movetype 					= MOVE_SEESAW;
+		AttackersDistractIt 		= True;
+		Mood 						= neutral_start;
+		path 						= epa_Path_11;
+		ReachedEndOfPath 		    = False;
+		Resumed 					= False;
+		Attacksoundplayed 	      	= False;					
+		Chaser						= True;
+		//teleportnav 				= ena_navElite1;								//Kick some Rescue Ass
+		//myPrison						= eve_Cargotrack1;
+		
+	endcase;
+	
+	case 2:															//Mechs to defend center
+	
+		attackrange					= 950;
+		piloting 				 	= 70;				
+		gunnery 				 	= 60;					
+		mindelay 					= 0.5;				
+		maxdelay 					= 1.0;				
+		speed 						= 300;						
+		elitelevel 					= 70;			
+		IsShotRadius 				= 80;
+		movetype 					= MOVE_SEESAW;
+		AttackersDistractIt 		= True;
+		Mood 						= neutral_start;
+		path 						= epa_Path_6;
+		ReachedEndOfPath 		    = False;
+		Resumed 					= False;
+		Attacksoundplayed 	      	= False;					
+		Chaser						= True;
+		Sleeper						= True;
+	 
+	endcase;
+	endswitch;
+ 	
+endfunction;
+
+//------------------------------------------------------------------
+//
+//     Main Code
+//				
+//								
+//------------------------------------------------------------------
+state startState;
+
+	code
+		SetFiringDelay					(me,mindelay,maxdelay);
+		setignorefriendlyfire		(me,true);
+		setisshotradius					(me,isshotradius);
+		setentropymood					(me,mood);
+		setcurmood							(me,mood);
+		setskilllevel						(me,piloting,gunnery,elitelevel);
+		//setsearchlight				(me,on);
+		//startexecute					(me);
+		//setalignment					(me,enemy);
+		
+	    if (Sleeper == True) then
+			shutdown(me);
+			//TeleportToHell(me);
+			trans hangout;
+		else
+		
+			trans patrol;
+		endif;
+endstate;			
+
+state deadState;
+  code
+		if (deathsound <> -1) then	
+			PlaySoundOnce(deathsound);
+		endif;		
+						
+		orderDie;
+endstate;
+
+state hangout;
+		
+	var
+		LocPoint my_nav;
+	
+  code
+		
+		If (RescueAll == true) then
+			startup(me);
+			//GetLocation(TeleportNav,my_nav);
+			//Teleport(me,my_nav);
+			orderMoveto(path,speed,movetype,true,true);
+			//setTarget(me,myPrison);
+			//trans RescueKillas;
+		endif;
+		
+		if isShot (me) then
+			startup(me);
+			setTarget(me,whoShot(me));
+			attackrange	= 1100;
+			Trans patrol;
+		endif;
+						
+endstate;
+	
+	state RescueKillas;
+		
+		code
+
+		speed = 600;
+		
+		SetTargetDesirability(myPrison,100);
+				
+		//the ever popular attack order
+    orderAttack (attackersdistractit);
+				
+		//maybe swap targets when I am shot.
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 								
+	endstate;
+	
+state RunAwaySTATE;
+		
+  code
+		
+			SetTargetDesirability(playermech,-1);
+			SetTargetDesirability(GroupObjectId(2),-1);
+			
+	        ordermovetoobject(ena_Nav_Epsilon,600);
+						
+endstate;
+	
+	state patrol;
+
+  var
+    ObjectID foe;
+
+		code
+
+	//head down the path.  If this has already been done
+	// or if there is no path set then look around.
+		if ((path <> -1) and (reachedendofpath == FALSE)) then
+				if ((orderMoveto(path,speed,movetype,true,true)) == TRUE) then
+					reachedendofpath = TRUE;
+				endif; 			
+		else	 		 		
+			ordermovelookout;			
+		endif;
+			
+		if isShot (me) then
+			setTarget(me,whoShot(me));
+			attackrange					= 1100;
+		endif;
+		
+		//Find me a target
+		if (setmytarget(attackrange)) then
+			trans attack;
+	 	endif;
+			
+	endstate;
+
+//------------------------------------------------------------------
+//
+//     attack state : description
+//
+//------------------------------------------------------------------
+	state attack;
+		
+		code
+		
+		speed = 600;						//Changed from 600 to 60 to keep 'em slow
+		
+		if (LeaveAttackState(attackrange*2)) then
+			orderstopattacking;
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,true);
+			else
+				trans patrol;
+			endif;
+		endif;
+		
+		If RunAway == True then
+            setTarget(me,no_unit);
+	        ordermovetoobject(ena_Nav_Epsilon,600);
+            trans RunAwaySTATE;
+		endif; 			
+		
+		//the ever popular attack order
+    orderAttack (attackersdistractit);
+		
+		//maybe swap targets when I am shot.
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 								
+	endstate;
+  	
+		state GiveChase;
+		
+		code
+
+		speed = 60;						//Changed from 600 to 60 to keep 'em slow
+		
+		if (LeaveAttackState(attackrange*3)) then
+			orderstopattacking;
+			
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,true);
+			else
+				trans patrol;
+			endif;
+		endif;
+		
+		//the ever popular attack order
+    orderAttack (attackersdistractit);
+				
+		//maybe swap targets when I am shot.
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 								
+	endstate;
+
+endfsm.
+//******************************************************************
+

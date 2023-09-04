@@ -1,0 +1,516 @@
+
+//*********************************************************************************
+//The below line MUST be changed in order for the script to be considered
+//a unique entity.  The word Patrol must be changed to some other unique identifier
+fsm Sc05_EnemyMechs : integer;
+
+//This unit patrols a specific path and attacks anything that comes near it.
+//------------------------------------------------------------------
+//
+//     Constant Definitions
+//
+//------------------------------------------------------------------
+	const
+		#include_ <content\ABLScripts\mwconst.abi>
+
+//------------------------------------------------------------------
+//
+//     Type Definitions
+//
+//------------------------------------------------------------------
+	type
+		#include_ <content\ABLScripts\mwtype.abi>
+	
+
+//------------------------------------------------------------------
+//
+//     Variable Declarations
+//
+//------------------------------------------------------------------
+	var
+	static integer			attackrange; 	    // When do I start shooting?
+											   			
+	static integer			piloting; 		    // piloting skill
+	static integer			gunnery; 		    // hit chance,
+	static real				mindelay;		    // minimum amount of time I will wait between shots once a weapon is reloaded
+	static real				maxdelay;		    // maximum amount of time I will wait between shots once a weapon is reloaded
+	static integer 			speed;			    // What speed so I move at?
+	static integer 			elitelevel; 	    // % elite chance, This helps determine tactics, defensive manuevers, opportunity fire
+	static integer			attackThrottle;	    // My attack throttle
+								                // and other things that would normally be determined by combat experience
+
+ 	static integer			isshotradius;	    // how far away from me will I detect an enemy shot.
+	static integer			movetype;		    // how will it move down the path?
+    
+	static Boolean 			attacksoundplayed;
+	static integer 			attacksound; 	    // plays when it first attacks
+	static integer 			deathsound; 	    // plays when it dies
+	
+	static integer			mood;			    // What is my normal mood?
+	
+	static Boolean			Resumed;			// Have I gotten to the end of the path?
+	static Boolean			reachedendofpath;	// Have I gotten to the end of the path?
+												// Note: This only gets set if movetype is set to move_nocycle.
+	static Boolean			reachedendwaitspot;
+	
+	static integer			path;				// what path am I following?
+	static Boolean 			attackersdistractit;// if FALSE, it won't leave the path, even when things
+												// are shooting it. It will shoot back. Defaults to true
+												// Once unit reaches the end of the path, It attacks freely.
+	
+	static Boolean 			Chaser;				// Left from other script
+	static Boolean 			Elite;				// These guys jump out of the dropship when it lands
+	static Boolean 			East;				// These guys come from the East as Backup
+	
+	static integer			teleportNav;		// All 'Mechs will have this value set to a different Nav
+	static locpoint			mystart;			// Where the backup guys start
+	
+	static ObjectID 		myVehicle;
+	
+	static Boolean 			Range;				// These guys come from the Shooting Range
+	//Moved to mission      static Boolean			FirstShot;			//USed to see if this is player's first shot against Kearson
+//	static integer			trainer_timer;
+//------------------------------------------------------------------
+//
+//     Local Functions
+//
+//------------------------------------------------------------------
+
+function init;
+	code
+	
+	Chaser 								= FALSE;
+	Elite 								= FALSE;
+	East	 							= FALSE;
+	
+	reachedendwaitspot					= FALSE;
+	
+	Range	 							= FALSE;
+	//FirstShot							= FALSE;
+	
+	// init timer here
+	
+	// trainer_timer = gti_timer_7;
+	 				
+ 	switch (GetMemoryInteger(me,9))
+
+	case 11:						//Osiris & Raven 11 Red			Far SouthWest
+	
+		attackrange					= 650;
+		piloting 				 	= 10;				
+		gunnery 				 	= 40;					
+		mindelay 					= 0.5;				
+		maxdelay 					= 1.0;				
+		speed 						= 60;						
+		elitelevel 					= 40;
+		attackThrottle				= 40;			
+		IsShotRadius 				= 80;
+		movetype 					= move_circle;
+		AttackersDistractIt 		= True;
+		Mood 						= neutral_start;
+		//path 						= epa_Path_11;
+		path 						= epa_Path_Range;
+		ReachedEndOfPath 			= False;
+		Resumed 					= False;
+		Attacksoundplayed 			= False;					
+		//Elite 					= TRUE;
+		//teleportnav 				= teleportS1Nav;
+		myVehicle					= playermech;
+		Range	 					= TRUE;
+		
+	endcase;
+		
+	case 12:						//Osiris & Raven 12 Blue		Far SouthWest
+			
+		attackrange        			= 650;
+		piloting            		= 10;
+		gunnery             		= 40;
+		mindelay           			= 0.5;
+		maxdelay            		= 1.0;
+		speed               		= 60;
+		elitelevel          		= 40;
+		IsShotRadius        		= 80;
+		attackThrottle				= 40;			
+		movetype 					= move_circle;
+		AttackersDistractIt 		= True;
+		Mood                		= neutral_start;
+		//path 						= epa_Path_12;
+		path 						= epa_Path_Range;
+		ReachedEndOfPath    		= False;
+		Resumed             		= False;
+		Attacksoundplayed   		= False;
+		//Elite 					= TRUE;
+		//teleportnav 				= teleportS2Nav;
+		myVehicle					= playermech;
+		Range	 					= TRUE;
+		
+	endcase;
+		
+	case 21:						//Cougar RED		Shooting Range		SWestern
+		
+		attackrange         		= 850;
+		piloting            		= 10;
+		gunnery             		= 40;
+		mindelay            		= 0.5;
+		maxdelay            		= 1.0;
+		speed               		= 60;
+		elitelevel          		= 40;
+		attackThrottle				= 40;			
+		IsShotRadius        		= 80;
+		movetype 					= move_circle;
+		AttackersDistractIt 		= True;
+		Mood                		= neutral_start;
+		path 						= epa_Path_Range;
+		ReachedEndOfPath    		= False;
+		Resumed             		= False;
+		Attacksoundplayed   		= False;
+		//East	 					= TRUE;
+		myVehicle					= playermech;
+		Range	 					= TRUE;
+		
+	endcase;
+		
+	case 22:						 	//Chimera RED		Shooting Range		SWestern
+		
+		attackrange         		= 850;
+		piloting            		= 10;
+		gunnery             		= 40;
+		mindelay            		= 0.5;
+		maxdelay            		= 1.0;
+		speed               		= 60;
+		elitelevel          		= 40;
+		attackThrottle				= 40;			
+		IsShotRadius        		= 80;
+		movetype 					= move_circle;
+		AttackersDistractIt 		= True;
+		Mood                		= neutral_start;
+		path 						= epa_Path_Range;
+		ReachedEndOfPath    		= False;
+		Resumed             		= False;
+		Attacksoundplayed   		= False;
+		//East	 					= TRUE;
+		myVehicle					= playermech;
+		Range	 					= TRUE;
+		
+	endcase;
+		
+	case 26:						 //Cougar BLUE		Shooting Range		NEastern
+	
+		attackrange         		= 850;
+		piloting           		 	= 10;
+		gunnery             		= 50;
+		mindelay            		= 0.5;
+		maxdelay            		= 1.0;
+		speed               		= 60;
+		elitelevel          		= 60;
+		attackThrottle				= 40;			
+		IsShotRadius        		= 80;
+		movetype 					= move_circle;
+		AttackersDistractIt 		= True;
+		Mood                		= neutral_start;
+		path 						= epa_Path_Range;
+		ReachedEndOfPath    		= False;
+		Resumed             		= False;
+		Attacksoundplayed   		= False;
+		//East	 					= TRUE;
+		myVehicle					= playermech;
+		Range	 					= TRUE;
+		
+	endcase;
+		
+	case 27:						 //Chimera BLUE		Shooting Range		NEastern
+	
+		attackrange         = 850;
+		piloting            = 10;
+		gunnery             = 40;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 60;
+		elitelevel          = 40;
+		attackThrottle		= 40;			
+		IsShotRadius        = 80;
+		movetype 			= move_circle;
+		//movetype 			= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 				= epa_Path_Range;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		//East	 			= TRUE;
+		myVehicle			= playermech;
+		Range	 			= TRUE;
+		
+	endcase;
+		
+	case 61:				 //eve_Sgt_Kearson and "threemechs"
+	
+		attackrange         = 850;
+		piloting            = 70;
+		gunnery             = 70;
+		mindelay            = 0.5;
+		maxdelay            = 1.0;
+		speed               = 80;
+		elitelevel          = 60;
+		attackThrottle		= 90;			
+		IsShotRadius        = 80;
+		movetype 			= move_circle;
+		//movetype 			= move_nocycle;
+		AttackersDistractIt = True;
+		Mood                = neutral_start;
+		path 				= epa_Path_Range;
+		ReachedEndOfPath    = False;
+		Resumed             = False;
+		Attacksoundplayed   = False;
+		//East	 			= TRUE;
+		myVehicle			= playermech;
+		
+	endcase;
+		
+	endswitch;
+ 	
+endfunction;
+
+//------------------------------------------------------------------
+//
+//     Main Code
+//				
+//								
+//------------------------------------------------------------------
+state startState;
+
+	code
+		SetFiringDelay					(me,mindelay,maxdelay);
+		setignorefriendlyfire			(me,true);
+		setisshotradius					(me,isshotradius);
+		setentropymood					(me,mood);
+		setcurmood						(me,mood);
+		setskilllevel					(me,piloting,gunnery,elitelevel);
+		//setsearchlight				(me,on);
+		//startexecute					(me);
+		//setalignment					(me,enemy);
+		SetAttackThrottle				(ME,attackThrottle);
+		
+		getlocation(me,mystart);
+		
+		if (Range == true) then
+			trans cinemashoot;
+		else
+		shutdown(me);
+		teleporttohell(me);
+			trans hangout;
+		endif;
+endstate;			
+
+state hangout;
+	
+	var
+		LocPoint my_nav;
+	
+	code
+		
+		if (CaptainAttack == true) then
+			startup(me);
+			GetLocation(TeleportNav,my_nav);
+			Teleport(me,my_nav);
+			trans patrol;
+		endif;
+						
+endstate;
+
+state deadState;
+  code
+		if (deathsound <> -1) then	
+			PlaySoundOnce(deathsound);
+		endif;		
+						
+		orderDie;
+endstate;
+	
+state cinemashoot;
+		
+  code
+			
+		if (Range == true) then
+			SetTarget(me,(GroupGetFirstObject(GroupObjectId(10))));
+			OrderAttackTactic(TACTIC_STAND_GROUND,false);
+		else
+			trans patrol;
+		endif;
+		  			
+		//Find me a target
+		if (isshot(me)) then
+			if (setmytarget(attackrange)) then
+				CadetsAttack = TRUE;
+				trans attack;
+			endif;
+	 	endif;
+			
+		if (CadetsAttack == TRUE) then
+			if (setmytarget(attackrange)) then
+				trans attack;
+			endif;
+	 	endif;
+		
+		if iswithin(me,playermech,250) then
+			if (setmytarget(attackrange)) then
+				CadetsAttack = TRUE;
+				trans attack;
+			endif;
+	 	endif;
+endstate;
+	
+	state patrol;
+
+  var
+    ObjectID foe;
+
+		code
+
+	//head down the path.  If this has already been done
+	// or if there is no path set then look around.
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+					if ((orderMoveto(path,speed,movetype,true,true)) == TRUE) then
+						reachedendofpath = TRUE;
+					endif; 			
+			else	 		 		
+				ordermovelookout;			
+			endif;
+			
+		//Find me a target
+		if (setmytarget(attackrange)) then
+			trans attack;
+	 	endif;
+			
+		if (CaseyAttack == TRUE) then
+		PATH		= epa_Path_CadetsRun;
+		movetype 	= move_NOCYCLE;
+		speed       = 600;
+			orderstopattacking;
+			trans RunAway;
+	 	endif;
+	
+	endstate;
+
+	state RunAway;
+
+  var
+    ObjectID foe;
+
+		code
+			orderstopattacking;
+	//head down the path.  If this has already been done
+	// or if there is no path set then look around.
+			if ((path <> -1) and (reachedendwaitspot == FALSE)) then
+					if ((orderMoveto(path,speed,movetype,true,true)) == TRUE) then
+						reachedendwaitspot = TRUE;
+					endif; 			
+			else	 		 		
+				ordermovelookout;			
+			endif;
+			
+			if iswithin(me,ena_navpoint,200) then
+				shutdown(me);
+				teleporttohell(me);
+			trans waitinhell;
+			endif;
+			
+    orderAttack (false);
+	
+	endstate;
+	
+	state WaitInHell;
+		
+		code
+		
+	endstate;
+//------------------------------------------------------------------
+//
+//     attack state : description
+//
+//------------------------------------------------------------------
+	state attack;
+		
+		code
+		
+		if (LeaveAttackState(attackrange*2)) then
+			orderstopattacking;
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,true);
+			else
+				trans patrol;
+			endif;
+		endif;
+		
+		//the ever popular attack order
+    orderAttack (attackersdistractit);
+		
+		//maybe swap targets when I am shot.
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+		 setTarget(me,whoShot(me));
+		endif;
+
+		
+		if (not FirstShot) then // check added by fifield to prevent reset for each shot
+			if (isShot(eve_Sgt_Kearson)) then
+				starttimer(gti_timer_6);
+				resettimer(gti_timer_6);
+				FirstShot = true
+			endif;
+		endif;
+		
+/*		if (trainer_hit == false) then              //Mike T moved to mission script for BUG 
+			if timegreater(gti_timer_6,30) then
+				trainer_hit=true;
+				orderstopattacking;
+				killtimer(gti_timer_6);
+			endif;
+		endif;
+*/		
+		// davelueh added, me afraid is set in main script when 2 cadets are killed.
+		if (Me_Afraid == true) then
+			if (range == true)	then
+				PATH	= epa_Path_CadetsRun;
+				attackersdistractit = false;
+				Speed 	=	600;
+			orderstopattacking;
+				Trans RunAway;
+			endif;
+		endif;
+        
+		if (CaseyAttack == TRUE) or (trainer_hit == TRUE) then  //added trainer_hit check to stop attack
+    		PATH							= epa_Path_CadetsRun;
+    		movetype 						= move_NOCYCLE;
+    		speed = 600;
+			orderstopattacking;
+			trans RunAway;
+	 	endif;
+	
+	endstate;
+  	
+	state StandFire;
+		
+		code
+		
+		if (LeaveAttackState(attackrange*2)) then
+			orderstopattacking;
+			if ((path <> -1) and (reachedendofpath == FALSE)) then
+				orderMoveResumePatrol(path,speed,movetype,true,true);
+			else
+				trans patrol;
+			endif;
+		endif;
+		
+		//the ever popular attack order
+		orderAttack (attackersdistractit);
+		
+		//maybe swap targets when I am shot.
+		if ((isShot (me)) and (rand(0,75) <= 1)) then
+  		setTarget(me,whoShot(me));
+		endif;
+ 								
+	endstate;
+  	
+endfsm.
+//******************************************************************
+
